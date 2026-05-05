@@ -1,6 +1,6 @@
 # CBTC simulator — project notes
 
-**Last updated:** 2026-05-04
+**Last updated:** 2026-05-05
 
 ## Framing
 
@@ -71,20 +71,38 @@ Safety is not necessarily a separate “box” in code forever, but conceptually
 
 ---
 
-## Frontend (intended)
+## Frontend (implemented v1 foundation)
 
-- **Line overview:** entire line with **all trains** visible.
-- **Drill-down:** zoom / focus on **one train** and visualize its **safe zone** (and relevant state).
-- **User configuration:** **rolling stock** profiles — acceleration/deceleration curves, mass, and other parameters **editable by the user** (not only developer constants).
+- Stack: **React + TypeScript + Canvas** with layered renderer and viewport camera in local meter-space.
+- Runtime model: backend-first by design, with automatic **mock fallback** when `/topology` is unreachable for UI-only work.
+- Core layers shipped:
+  - track geometry
+  - occupied block overlays
+  - switches / crossovers
+  - signals (including blinking aspects)
+  - trains with heading and safe-zone visual hints
+  - labels
+- Interaction shipped:
+  - pan (drag), zoom-at-cursor (wheel), fit-to-bounds (double-click)
+  - hover tooltips
+  - click-to-command for switches/signals (manual control path)
+- Operational HUD shipped:
+  - clock
+  - stale-data warning
+  - error banner
+  - mock mode badge
+- Config panel scaffold shipped for rolling-stock profile and event-injection tuning (advanced panel toggle).
 
 ---
 
-## Open design questions (to resolve as you implement)
+## Open design questions (current)
 
 - Exact fields on `TrainCommand` beyond **direction**, **setpoints**, and **driver emergency brake** (e.g. ATO on/off, hold, door interlocks) — add only when the sim needs them.
 - Exact split between “controller” vs “ATO” vs “ATP” modules (names matter less than **who may write what state**).
 - How **operations DB** schema maps to **line geometry** IDs (stations, track segments).
 - How much **Toronto** data is **realistic import** vs **placeholder** for v1.
+- Exactly how safe-zone visuals should map to backend ATP authority primitives (currently visualized in frontend; authority logic still backend-owned).
+- Final persistence shape for command overrides (for example signal manual overrides vs polling refresh semantics).
 
 ---
 
