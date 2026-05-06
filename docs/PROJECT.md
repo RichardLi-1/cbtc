@@ -53,6 +53,19 @@ Safety is not necessarily a separate “box” in code forever, but conceptually
 
 ---
 
+## Replay and offline policy evaluation
+
+For comparing **classical control / ATO** vs **RL** (and for debugging control logic without rerunning ad hoc sims), the intended tooling is:
+
+- **Deterministic replay**: re-run a saved simulation episode from initial conditions and per-step seeds so failures reproduce exactly.
+- **Step-level traces**: per timestep, log state, commanded action, reward terms, constraint / safety-check outcomes, and whether a **fallback controller** replaced an unsafe RL action.
+- **Episode analytics**: aggregate metrics across many runs (delay, OTP-style punctuality, unsafe-action attempts, intervention rate) for **offline policy evaluation** over large batches of episodes (e.g. **1,000+** in a tight evaluation sweep).
+- **Comparison mode**: replay the same scenario under two policies (or RL vs baseline) to diff behaviour at specific incidents.
+
+Goal: turn “rerun until we reproduce the bug” into targeted triage — scrub to the failing timestep and see **why** the controller chose what it did. Quantitative impact (e.g. median minutes saved per incident) is something you measure once the tooling exists; resume-style numbers stay hypothetical until then.
+
+---
+
 ## First milestones (backend)
 
 ### Physics
@@ -109,3 +122,6 @@ Safety is not necessarily a separate “box” in code forever, but conceptually
 ## Document purpose
 
 This file records **your** architectural intent so implementation choices stay aligned. Update it when you change direction (e.g. when RL re-enters scope or when the first TTC line configuration is fixed).
+
+
+This can also later be a tool to research how AI can act in traffic control environments
