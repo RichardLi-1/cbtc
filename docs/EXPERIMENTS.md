@@ -1,4 +1,4 @@
-# Experiment protocol scaffold
+# Experiment protocol
 
 - fixed seeds
 - train/eval splits

@@ -12,4 +12,4 @@ class ExperimentRunner:
         set_global_seed(int(self.cfg.get('seed', 42)))
         self.run_dir.mkdir(parents=True, exist_ok=True)
         (self.run_dir / 'config.json').write_text(json.dumps(self.cfg, indent=2))
-        (self.run_dir / 'train.log').write_text('training scaffold initialized\n')
+        (self.run_dir / 'train.log').write_text('training pipeline initialized\n')

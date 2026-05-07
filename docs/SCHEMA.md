@@ -1,4 +1,4 @@
-# Data schema scaffold
+# Data schema
 
 - event rows
 - train state snapshots

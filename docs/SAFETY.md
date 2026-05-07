@@ -1,4 +1,4 @@
-# Safety framework scaffold
+# Safety framework
 
 - constraint validation
 - shielding
