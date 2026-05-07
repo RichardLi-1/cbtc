@@ -1,0 +1,10 @@
+name: weekday_peak
+line:
+  station_count: 124
+  route_length_km: 97.3
+operations:
+  daily_train_events: 3520
+  peak_trains_per_hour_directional: 32
+disturbances:
+  signal_drops_per_day: 12
+  dwell_time_noise_sec: [0, 25]

@@ -1,0 +1,10 @@
+name: sac_baseline
+seed: 42
+total_timesteps: 1000000
+env:
+  scenario: configs/scenarios/weekday_peak.yaml
+  episode_horizon_steps: 3600
+policy:
+  algo: sac
+  learning_rate: 3e-4
+  buffer_size: 100000

@@ -1,0 +1,6 @@
+metrics:
+  - avg_delay_sec
+  - p95_delay_sec
+  - headway_std_sec
+  - unsafe_action_rate
+  - intervention_rate

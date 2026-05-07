@@ -1,0 +1,5 @@
+name: rule_based_dispatch
+controller:
+  hold_max_sec: 45
+  target_headway_sec: 165
+  gain: 0.25

@@ -1,0 +1,21 @@
+name: ppo_baseline
+seed: 42
+total_timesteps: 1000000
+eval_every_steps: 50000
+env:
+  scenario: configs/scenarios/weekday_peak.yaml
+  episode_horizon_steps: 3600
+  dt_seconds: 1
+policy:
+  algo: ppo
+  learning_rate: 3e-4
+  n_steps: 2048
+  batch_size: 64
+  gamma: 0.99
+  gae_lambda: 0.95
+safety:
+  shield_enabled: true
+  hard_constraints:
+    - authority_distance
+    - braking_distance
+    - max_speed
