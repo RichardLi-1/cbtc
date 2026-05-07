@@ -1,0 +1,7 @@
+name: weekend_service
+line:
+  station_count: 124
+operations:
+  daily_train_events: 2210
+disturbances:
+  signal_drops_per_day: 4
