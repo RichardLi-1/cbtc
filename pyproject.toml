@@ -1,0 +1,9 @@
+[project]
+name = "rlcbtc-scaffold"
+version = "0.1.0"
+description = "Heavy RL CBTC simulator scaffold"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

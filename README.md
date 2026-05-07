@@ -1,60 +1,39 @@
-# CBTC Simulator
+# CBTC RL Dispatch Scaffold (Heavy)
 
-Simplified CBTC-style simulation and control-room frontend inspired by TTC operations.
+This repository now hosts a **realistic RL + CBTC simulator scaffold** designed for rapid iteration, demos, and resume storytelling.
 
-## Current status
+Your original project has been preserved in `legacy_original/` unchanged.
 
-- Backend simulation is Python-based and remains the system-of-record.
-- Frontend is implemented in `frontend/` using React + Canvas.
-- Frontend auto-falls back to mock mode if backend endpoints are unavailable.
-
-## Repository layout
-
-- `backend/`: simulation domain objects and runtime stepping
-- `frontend/`: dispatch-style UI, camera/viewport, layers, controls
-- `docs/PROJECT.md`: architecture notes and project intent
-
-## Frontend capabilities (implemented)
-
-- Dark dispatch panel with layered rendering:
-  - track geometry
-  - block occupancy overlays
-  - switches and crossovers
-  - signals
-  - trains (with direction + safe-zone visualization)
-  - labels
-- Interaction model:
-  - drag to pan
-  - wheel to zoom at cursor
-  - double-click to fit bounds
-  - hover tooltips
-  - click switch/signal to send manual commands
-- Runtime behavior:
-  - state polling (200 ms)
-  - stale-data indicator and API error banner
-  - mock fallback mode when backend is unreachable
-
-## Frontend run
+## Quick start
 
 ```bash
-cd frontend
-npm install
-npm run dev
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m rlcbtc.cli.train --config configs/experiments/ppo_baseline.yaml
+python -m rlcbtc.cli.evaluate --run-dir runs/ppo_baseline/latest
 ```
 
-Default dev URL is `http://localhost:5175` (or next free port).
+## What is included
 
-## Backend integration contract (frontend-facing)
+- Event-driven subway simulation primitives
+- Gymnasium-compatible RL environment shell
+- PPO training/evaluation scaffolding
+- Rule-based baseline and comparator
+- Safety shielding + violation logging hooks
+- Synthetic scenario generation and seeded experiment loops
+- Report generation stubs and artifacts layout
 
-- `GET /topology`
-- `GET /state`
-- `POST /commands/switch/...`
-- `POST /commands/signal/...`
+## Directory map
 
-`vite.config.ts` proxies these paths to `localhost:8000` in development.
+- `rlcbtc/` core packages
+- `configs/` experiment, scenario, and policy configs
+- `scripts/` thin wrappers for reproducible runs
+- `tests/` structural and smoke tests
+- `runs/` generated artifacts (gitignored)
+- `legacy_original/` your previous code
 
-## Next recommended steps
+## Notes
 
-- Add Vitest unit tests for geometry helpers.
-- Add one integration test for store + API sync flow.
-- Persist manual signal override behavior in backend state flow.
+- This is intentionally scaffold-heavy: realistic shape, minimal hard coupling.
+- Remove by deleting `rlcbtc/`, `configs/`, `scripts/`, `tests/`, and this README.
