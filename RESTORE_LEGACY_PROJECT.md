@@ -2,7 +2,7 @@
 
 If you want to revert to your previous structure:
 
-1. Move scaffold out of the way (or delete it).
+1. Move current root code out of the way (or delete it).
 2. Move everything from `legacy_original/` back to repo root.
 
 Example:

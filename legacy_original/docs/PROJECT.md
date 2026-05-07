@@ -62,7 +62,7 @@ For comparing **classical control / ATO** vs **RL** (and for debugging control l
 - **Episode analytics**: aggregate metrics across many runs (delay, OTP-style punctuality, unsafe-action attempts, intervention rate) for **offline policy evaluation** over large batches of episodes (e.g. **1,000+** in a tight evaluation sweep).
 - **Comparison mode**: replay the same scenario under two policies (or RL vs baseline) to diff behaviour at specific incidents.
 
-Goal: turn “rerun until we reproduce the bug” into targeted triage — scrub to the failing timestep and see **why** the controller chose what it did. Quantitative impact (e.g. median minutes saved per incident) is something you measure once the tooling exists; resume-style numbers stay hypothetical until then.
+Goal: turn “rerun until we reproduce the bug” into targeted triage — scrub to the failing timestep and see **why** the controller chose what it did. Quantitative impact (e.g. median minutes saved per incident) is something you measure once the tooling exists; headline metrics stay hypothetical until then.
 
 ---
 
@@ -104,7 +104,7 @@ Goal: turn “rerun until we reproduce the bug” into targeted triage — scrub
   - stale-data warning
   - error banner
   - mock mode badge
-- Config panel scaffold shipped for rolling-stock profile and event-injection tuning (advanced panel toggle).
+- Config panel foundation shipped for rolling-stock profile and event-injection tuning (advanced panel toggle).
 
 ---
 

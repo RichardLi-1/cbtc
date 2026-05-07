@@ -1,39 +1,81 @@
-# CBTC RL Dispatch Scaffold (Heavy)
+# CBTC RL Dispatch System
 
-This repository now hosts a **realistic RL + CBTC simulator scaffold** designed for rapid iteration, demos, and resume storytelling.
+Reinforcement-learning dispatch research environment for CBTC-style subway operations.  
+The project models service dynamics, evaluates dispatch policies against rule-based control, and tracks delay/headway/safety outcomes in repeatable simulation runs.
 
-Your original project has been preserved in `legacy_original/` unchanged.
+## Features
 
-## Quick start
+- Gymnasium-compatible dispatch environment
+- PPO and SAC trainer entry points (via Stable-Baselines3)
+- Rule-based baseline policy for A/B comparison
+- Safety layer hooks for constraint validation and intervention logging
+- Config-driven experiments and scenarios
+- Evaluation and run-to-run comparison commands
+
+## Project Status
+
+This repository is in active development. Core package structure and command flows are in place, with additional simulation realism and policy logic being expanded iteratively.
+
+## Getting Started
+
+### Requirements
+
+- Python 3.10+
+
+### Setup
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+### Train a policy
+
+```bash
 python -m rlcbtc.cli.train --config configs/experiments/ppo_baseline.yaml
+```
+
+### Evaluate a run
+
+```bash
 python -m rlcbtc.cli.evaluate --run-dir runs/ppo_baseline/latest
 ```
 
-## What is included
+### Compare RL vs baseline
 
-- Event-driven subway simulation primitives
-- Gymnasium-compatible RL environment shell
-- PPO training/evaluation scaffolding
-- Rule-based baseline and comparator
-- Safety shielding + violation logging hooks
-- Synthetic scenario generation and seeded experiment loops
-- Report generation stubs and artifacts layout
+```bash
+python -m rlcbtc.cli.compare --rl-run runs/ppo_baseline/latest --baseline-run runs/rule_based/latest
+```
 
-## Directory map
+## Repository Layout
 
-- `rlcbtc/` core packages
-- `configs/` experiment, scenario, and policy configs
-- `scripts/` thin wrappers for reproducible runs
-- `tests/` structural and smoke tests
-- `runs/` generated artifacts (gitignored)
-- `legacy_original/` your previous code
+- `rlcbtc/`: simulation, environments, policies, safety, training, evaluation, reporting
+- `configs/`: experiment/scenario/policy/safety/report configuration files
+- `scripts/`: shell wrappers for common train/evaluate/compare/report flows
+- `tests/`: smoke and unit tests
+- `runs/`: generated artifacts and outputs
 
-## Notes
+## Development
 
-- This is intentionally scaffold-heavy: realistic shape, minimal hard coupling.
-- Remove by deleting `rlcbtc/`, `configs/`, `scripts/`, `tests/`, and this README.
+Run tests:
+
+```bash
+pytest -q
+```
+
+Or with Make targets:
+
+```bash
+make train
+make eval
+make test
+make report
+```
+
+## Roadmap
+
+- Expand dispatch environment state/action realism
+- Integrate stronger safety-constraint enforcement
+- Add richer metrics and significance analysis
+- Improve reproducibility and experiment tracking

@@ -1,7 +1,7 @@
 [project]
-name = "rlcbtc-scaffold"
+name = "rlcbtc"
 version = "0.1.0"
-description = "Heavy RL CBTC simulator scaffold"
+description = "RL CBTC simulator"
 readme = "README.md"
 requires-python = ">=3.10"
 
