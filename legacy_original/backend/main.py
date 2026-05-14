@@ -1,9 +1,13 @@
+import io
 import json
+import contextlib
+import threading
 import time
 
 from fastapi import FastAPI
 import train
 import topology
+from sim import DT as _DT
 
 app = FastAPI()
 
@@ -12,6 +16,27 @@ app = FastAPI()
 _TRAIN_ROUTE = topology.YUS_TRAIN_ROUTE
 _EDGES       = {e['id']: e for e in topology.YUS_TOPOLOGY['edges']}
 _ROUTE_LEN   = sum(_EDGES[eid]['length'] for eid in _TRAIN_ROUTE)
+
+# ── Spread trains evenly around the route and give them initial speed ───────
+
+_sim_trains = train.lines[0].trains if train.lines else []
+for _i, _t in enumerate(_sim_trains):
+    _t.position = _ROUTE_LEN * _i / max(len(_sim_trains), 1)
+    _t.speed    = 60.0  # kph, start at cruise speed
+    _t.acceleration_level = 3.0
+
+# ── Background simulation thread ────────────────────────────────────────────
+
+def _sim_loop() -> None:
+    _devnull = io.StringIO()
+    while True:
+        with contextlib.redirect_stdout(_devnull):
+            for line in train.lines:
+                for t in line.trains:
+                    t.step(_DT)
+        time.sleep(_DT)
+
+threading.Thread(target=_sim_loop, daemon=True).start()
 
 
 def _pos_to_edge(position: float) -> tuple[str, float]:

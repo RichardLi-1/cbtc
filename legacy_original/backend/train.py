@@ -150,7 +150,13 @@ def getState():
     payload = [state for state in states]
     return json.dumps(payload)
 
-lines: list['Line'] = [Line("YUS")]
+def _init_lines() -> list['Line']:
+    yus = Line("YUS")
+    for _ in range(3):
+        yus.dispatchTrain()
+    return [yus]
+
+lines: list['Line'] = _init_lines()
 
 if __name__ == "__main__":
     for i in range(100000):
