@@ -3,8 +3,8 @@ import type { Viewport } from '../Viewport'
 import { COLORS } from '../../constants/colors'
 import { interpolatePolyline, tangentAtT } from '../../utils/geometry'
 
-const TRAIN_W = 28   // screen px (half-width)
-const TRAIN_H = 10   // screen px (half-height)
+const TRAIN_W = 18   // screen px (half-width)
+const TRAIN_H = 5    // screen px (half-height)
 
 function trainColor(train: TrainPosition): string {
   if (train.state === 'dwelling') return COLORS.TRAIN_DWELL

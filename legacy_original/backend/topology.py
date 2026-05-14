@@ -5,7 +5,7 @@ import json, math
 from pathlib import Path
 
 _DATA_DIR = Path(__file__).resolve().parent / "data"
-_TRACK_SEP = 10   # pixels between outbound and inbound tracks
+_TRACK_SEP = 22   # pixels between outbound and inbound tracks
 _PAD       = 200  # canvas padding
 
 
