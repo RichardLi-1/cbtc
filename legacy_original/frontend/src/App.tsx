@@ -4,6 +4,7 @@ import { useRuntimeStore } from './store/runtimeStore'
 import { CanvasView } from './components/CanvasView'
 import { ControlPanel } from './components/ControlPanel'
 import { ConfigPanel } from './components/ConfigPanel'
+import { BackendNotice } from './components/BackendNotice'
 import { COLORS } from './constants/colors'
 
 export default function App() {
@@ -32,6 +33,7 @@ export default function App() {
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', background: COLORS.BACKGROUND, overflow: 'hidden' }}>
       <ControlPanel />
+      <BackendNotice />
       <div style={{ position: 'absolute', top: 38, left: 0, right: 0, bottom: 0 }}>
         <CanvasView />
       </div>

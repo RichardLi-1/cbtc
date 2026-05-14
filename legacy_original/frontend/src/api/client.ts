@@ -1,5 +1,6 @@
 import type { Topology, RuntimeState, SwitchState, SignalAspect } from '../types/domain'
 import { MOCK_TOPOLOGY, tickMockRuntime } from '../mock/mockData'
+import { useConnectionStore } from '../store/connectionStore'
 
 const BASE = ''   // proxied by Vite dev server
 const TIMEOUT_MS = 4000
@@ -8,8 +9,14 @@ const RETRY_DELAYS = [500, 1000, 2000]   // ms between retries
 // Set to true to skip real API calls entirely
 export let MOCK_MODE = false
 
-export function enableMockMode() { MOCK_MODE = true }
-export function disableMockMode() { MOCK_MODE = false }
+export function enableMockMode() {
+  MOCK_MODE = true
+  useConnectionStore.getState().setMockMode(true)
+}
+export function disableMockMode() {
+  MOCK_MODE = false
+  useConnectionStore.getState().setMockMode(false)
+}
 
 // ── Fetch helpers ──────────────────────────────────────────────────────────
 
@@ -45,8 +52,11 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
 export async function fetchTopology(): Promise<Topology> {
   if (MOCK_MODE) return MOCK_TOPOLOGY
   try {
-    return await withRetry(() => apiFetch<Topology>('/topology'))
-  } catch {
+    const result = await withRetry(() => apiFetch<Topology>('/topology'))
+    useConnectionStore.getState().report('topology', 'ok')
+    return result
+  } catch (err) {
+    useConnectionStore.getState().report('topology', 'error', String(err))
     console.warn('[api] /topology failed, falling back to mock')
     enableMockMode()
     return MOCK_TOPOLOGY
@@ -62,23 +72,42 @@ export async function fetchState(): Promise<RuntimeState> {
     _lastMockTick = now
     return tickMockRuntime(dt)
   }
-  return withRetry(() => apiFetch<RuntimeState>('/state'))
+  try {
+    const result = await withRetry(() => apiFetch<RuntimeState>('/state'))
+    useConnectionStore.getState().report('state', 'ok')
+    return result
+  } catch (err) {
+    useConnectionStore.getState().report('state', 'error', String(err))
+    throw err
+  }
 }
 
 export async function commandSwitch(switchId: string, state: SwitchState): Promise<void> {
   if (MOCK_MODE) return
-  await apiFetch(`/commands/switch/${switchId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ state }),
-  })
+  try {
+    await apiFetch(`/commands/switch/${switchId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state }),
+    })
+    useConnectionStore.getState().report('commands', 'ok')
+  } catch (err) {
+    useConnectionStore.getState().report('commands', 'error', String(err))
+    throw err
+  }
 }
 
 export async function commandSignal(signalId: string, aspect: SignalAspect): Promise<void> {
   if (MOCK_MODE) return
-  await apiFetch(`/commands/signal/${signalId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ aspect }),
-  })
+  try {
+    await apiFetch(`/commands/signal/${signalId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aspect }),
+    })
+    useConnectionStore.getState().report('commands', 'ok')
+  } catch (err) {
+    useConnectionStore.getState().report('commands', 'error', String(err))
+    throw err
+  }
 }

@@ -1,4 +1,5 @@
-import fastapi
+from fastapi import FastAPI
+import train
 
 
 app = FastAPI()
@@ -10,7 +11,9 @@ def main():
 @app.get('/state')
 def getState():
     print("Called API to get state")
-    
+    res = train.getState()
+    return res
+
 
 
 

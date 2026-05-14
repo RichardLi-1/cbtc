@@ -1,6 +1,6 @@
 import { useRuntimeStore } from '../store/runtimeStore'
+import { useConnectionStore, type EndpointHealth, type EndpointKey } from '../store/connectionStore'
 import { COLORS } from '../constants/colors'
-import { MOCK_MODE } from '../api/client'
 
 interface BtnProps {
   label: string
@@ -30,9 +30,34 @@ function Btn({ label, active, danger, onClick }: BtnProps) {
   )
 }
 
+const DOT_COLOR: Record<EndpointHealth, string> = {
+  untested: COLORS.PANEL_TEXT_DIM,
+  ok: COLORS.SIGNAL_GREEN,
+  error: COLORS.SIGNAL_RED,
+}
+
+function EndpointDot({ ep, label }: { ep: EndpointKey; label: string }) {
+  const info = useConnectionStore((s) => s.endpoints[ep])
+  return (
+    <span
+      title={info.error ?? (info.health === 'ok' ? `${label} OK` : `${label} not yet tested`)}
+      style={{
+        color: DOT_COLOR[info.health],
+        fontFamily: 'monospace',
+        fontSize: 10,
+        letterSpacing: '0.04em',
+        cursor: info.error ? 'help' : 'default',
+      }}
+    >
+      ● {label}
+    </span>
+  )
+}
+
 export function ControlPanel() {
   const { runtime, stale, commandError, showSafeZones, showLabels, clearCommandError, toggleSafeZones, toggleLabels } =
     useRuntimeStore()
+  const { mockMode } = useConnectionStore()
 
   const ts = runtime?.timestamp?.toFixed(1) ?? '—'
 
@@ -63,8 +88,13 @@ export function ControlPanel() {
         T+{ts}s
       </span>
 
+      {/* Endpoint health dots */}
+      <EndpointDot ep="topology" label="/topology" />
+      <EndpointDot ep="state" label="/state" />
+      <EndpointDot ep="commands" label="/commands" />
+
       {/* Mock badge */}
-      {MOCK_MODE && (
+      {mockMode && (
         <span style={{ color: COLORS.SIGNAL_YELLOW, fontFamily: 'monospace', fontSize: 10, border: `1px solid ${COLORS.SIGNAL_YELLOW}`, padding: '1px 5px', borderRadius: 2 }}>
           MOCK
         </span>
