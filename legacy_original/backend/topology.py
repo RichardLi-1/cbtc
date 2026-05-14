@@ -75,21 +75,31 @@ def _build_yus() -> tuple[dict, list[str]]:
             'length': _edge_len(a['x'], a['y'], b['x'], b['y']),
         })
 
-    # terminus crossovers (Vaughan MC end and Finch end)
+    # ── crossover edges ─────────────────────────────────────────────────────
     def _xover(eid, fn, tn) -> dict:
         a, b = nd(fn), nd(tn)
         return {
             'id': eid, 'from_node': fn, 'to_node': tn, 'block_id': f'XOVER_{eid.upper()}',
             'points': [{'x': a['x'], 'y': a['y']}, {'x': b['x'], 'y': b['y']}],
-            'length': _edge_len(a['x'], a['y'], b['x'], b['y']) or 10.0,
+            'length': max(_edge_len(a['x'], a['y'], b['x'], b['y']), 10.0),
         }
 
+    # Terminus loops
     xovers = [
         _xover('xover_start', f'ib_0',     f'ob_0'),
         _xover('xover_end',   f'ob_{n-1}', f'ib_{n-1}'),
     ]
 
-    all_edges = ob_edges + ib_edges + xovers
+    # Mid-line crossovers at real Line 1 pocket/crossover locations (stop indices)
+    # 6=Sheppard West, 11=Eglinton West, 14=Spadina, 27=Bloor-Yonge, 32=Eglinton, 35=Sheppard-Yonge
+    MID_XOVER_STOPS = [6, 11, 14, 27, 32, 35]
+    mid_xovers = []
+    for idx in MID_XOVER_STOPS:
+        if 0 < idx < n - 1:
+            mid_xovers.append(_xover(f'xover_mid_{idx}', f'ob_{idx}', f'ib_{idx}'))
+
+    all_xovers = xovers + mid_xovers
+    all_edges  = ob_edges + ib_edges + all_xovers
 
     # ── signals (one per revenue edge, 8 % from start) ──
     signals = []
@@ -115,17 +125,29 @@ def _build_yus() -> tuple[dict, list[str]]:
         ['xover_start']
     )
 
+    switches = [
+        {'id': 'sw_start', 'node_id': f'ob_0',     'normal_edge_id': f'ob_0_1',         'reverse_edge_id': 'xover_start', 'state': 'normal'},
+        {'id': 'sw_end',   'node_id': f'ob_{n-1}', 'normal_edge_id': f'ob_{n-2}_{n-1}', 'reverse_edge_id': 'xover_end',   'state': 'normal'},
+    ]
+    for idx in MID_XOVER_STOPS:
+        if 0 < idx < n - 1:
+            switches.append({'id': f'sw_mid_{idx}', 'node_id': f'ob_{idx}',
+                             'normal_edge_id': f'ob_{idx}_{idx+1}',
+                             'reverse_edge_id': f'xover_mid_{idx}', 'state': 'normal'})
+
+    crossovers = [
+        {'id': 'xov_start', 'edge1_id': f'ob_0_1',         'edge2_id': f'ib_1_0',         'node_id': f'ob_0'},
+        {'id': 'xov_end',   'edge1_id': f'ob_{n-2}_{n-1}', 'edge2_id': f'ib_{n-1}_{n-2}', 'node_id': f'ob_{n-1}'},
+        *[{'id': f'xov_mid_{idx}', 'edge1_id': f'ob_{idx}_{idx+1}',
+           'edge2_id': f'ib_{idx+1}_{idx}', 'node_id': f'ob_{idx}'}
+          for idx in MID_XOVER_STOPS if 0 < idx < n - 1]
+    ]
+
     topology = {
         'nodes':      list(nodes.values()),
         'edges':      all_edges,
-        'switches': [
-            {'id': 'sw_start', 'node_id': f'ob_0',     'normal_edge_id': f'ob_0_1',         'reverse_edge_id': 'xover_start', 'state': 'normal'},
-            {'id': 'sw_end',   'node_id': f'ob_{n-1}', 'normal_edge_id': f'ob_{n-2}_{n-1}', 'reverse_edge_id': 'xover_end',   'state': 'normal'},
-        ],
-        'crossovers': [
-            {'id': 'xov_start', 'edge1_id': f'ob_0_1',         'edge2_id': f'ib_1_0',         'node_id': f'ob_0'},
-            {'id': 'xov_end',   'edge1_id': f'ob_{n-2}_{n-1}', 'edge2_id': f'ib_{n-1}_{n-2}', 'node_id': f'ob_{n-1}'},
-        ],
+        'switches':   switches,
+        'crossovers': crossovers,
         'signals':    signals,
         'bounds':     bounds,
     }
