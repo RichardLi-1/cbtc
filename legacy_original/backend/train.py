@@ -150,13 +150,8 @@ def getState():
     payload = [state for state in states]
     return json.dumps(payload)
 
-global lines
-lines: list['Line'] = []
+lines: list['Line'] = [Line("YUS")]
 
 if __name__ == "__main__":
-
-    yus = Line("YUS")
     for i in range(100000):
-        yus.step(DT)
-    
-    lines.append(yus)
+        lines[0].step(DT)
