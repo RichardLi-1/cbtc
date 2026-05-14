@@ -1,95 +1,138 @@
-"""Static line topology for map clients (separate from live /state)."""
+"""Static line topology for map clients, built from real GTFS-derived stop coordinates."""
 
 from __future__ import annotations
+import json, math
+from pathlib import Path
 
-_NB_Y = 20
-_SB_Y = 80
-_STATION_X = [0, 600, 1200, 1800, 2400, 3000, 3600]
-_STATION_NAMES = ['Finch', 'York Mills', 'Lawrence', 'Eglinton', 'Davisville', 'St. Clair', 'Summerhill']
-
-
-def _nb_edge(i: int) -> dict:
-    x0, x1 = _STATION_X[i], _STATION_X[i + 1]
-    return {
-        'id': f'nb_{i}{i + 1}',
-        'from_node': f'nb_{i}', 'to_node': f'nb_{i + 1}',
-        'block_id': f'NB_B{i + 1}',
-        'points': [{'x': x0, 'y': _NB_Y}, {'x': x1, 'y': _NB_Y}],
-        'length': x1 - x0,
-    }
+_DATA_DIR = Path(__file__).resolve().parent / "data"
+_TRACK_SEP = 10   # pixels between outbound and inbound tracks
+_PAD       = 200  # canvas padding
 
 
-def _sb_edge(i: int) -> dict:
-    x0, x1 = _STATION_X[i], _STATION_X[i - 1]
-    return {
-        'id': f'sb_{i}{i - 1}',
-        'from_node': f'sb_{i}', 'to_node': f'sb_{i - 1}',
-        'block_id': f'SB_B{i}',
-        'points': [{'x': x0, 'y': _SB_Y}, {'x': x1, 'y': _SB_Y}],
-        'length': abs(x1 - x0),
-    }
+def _build_yus() -> tuple[dict, list[str]]:
+    raw   = json.loads((_DATA_DIR / "yus_topology.json").read_text(encoding="utf-8"))
+    stops = raw["line"]["stops"]   # [{name, coords:[lon,lat]}, ...]
+    n     = len(stops)
 
+    # ── project lon/lat → canvas pixels (equirectangular, aspect-correct) ──
+    lons = [s["coords"][0] for s in stops]
+    lats = [s["coords"][1] for s in stops]
+    lon_min, lon_max = min(lons), max(lons)
+    lat_min, lat_max = min(lats), max(lats)
+    cos_lat = math.cos(math.radians((lat_min + lat_max) / 2))
+    x_span  = (lon_max - lon_min) * cos_lat
+    y_span  = lat_max - lat_min
+    scale   = min(6000 / x_span, 5000 / y_span)   # fit in ~6000×5000
 
-_nb_edges  = [_nb_edge(i) for i in range(6)]
-_sb_edges  = [_sb_edge(i) for i in [6, 5, 4, 3, 2, 1]]
-_xovers    = [
-    {
-        'id': 'xover_north', 'from_node': 'nb_6', 'to_node': 'sb_6',
-        'block_id': 'XOVER_N',
-        'points': [{'x': 3600, 'y': _NB_Y}, {'x': 3660, 'y': (_NB_Y + _SB_Y) / 2}, {'x': 3600, 'y': _SB_Y}],
-        'length': 130,
-    },
-    {
-        'id': 'xover_south', 'from_node': 'sb_0', 'to_node': 'nb_0',
-        'block_id': 'XOVER_S',
-        'points': [{'x': 0, 'y': _SB_Y}, {'x': -60, 'y': (_NB_Y + _SB_Y) / 2}, {'x': 0, 'y': _NB_Y}],
-        'length': 130,
-    },
-    {
-        'id': 'xover_mid_nb_sb', 'from_node': 'nb_3', 'to_node': 'sb_3',
-        'block_id': 'XOVER_MID',
-        'points': [{'x': 1800, 'y': _NB_Y}, {'x': 1800, 'y': _SB_Y}],
-        'length': _SB_Y - _NB_Y,
-    },
-]
-_all_edges = _nb_edges + _sb_edges + _xovers
+    def proj(lon: float, lat: float) -> tuple[float, float]:
+        return (
+            round(_PAD + (lon - lon_min) * cos_lat * scale, 1),
+            round(_PAD + (lat_max - lat) * scale,           1),
+        )
 
+    pts = [proj(s["coords"][0], s["coords"][1]) for s in stops]
 
-def _make_signals() -> list:
-    sigs = []
-    for e in _nb_edges + _sb_edges:
-        p0, p1, t = e['points'][0], e['points'][-1], 0.08
-        sigs.append({
-            'id': f"sig_{e['id']}",
-            'edge_id': e['id'],
-            'offset': t,
-            'position': {'x': p0['x'] + t * (p1['x'] - p0['x']), 'y': p0['y'] + t * (p1['y'] - p0['y'])},
-            'aspect': 'green',
-            'block_id': e['block_id'],
+    # ── per-stop perpendicular offset (separates OB and IB tracks) ──
+    def _perp(i: int) -> tuple[float, float]:
+        a = pts[max(i - 1, 0)]
+        b = pts[min(i + 1, n - 1)]
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L = math.hypot(dx, dy) or 1
+        return -dy / L * _TRACK_SEP / 2, dx / L * _TRACK_SEP / 2
+
+    offsets = [_perp(i) for i in range(n)]
+
+    # ── nodes ──
+    nodes: dict[str, dict] = {}
+    for i, s in enumerate(stops):
+        ox, oy = offsets[i]
+        x,  y  = pts[i]
+        nodes[f'ob_{i}'] = {'id': f'ob_{i}', 'x': x + ox, 'y': y + oy, 'label': s['name'], 'is_station': True}
+        nodes[f'ib_{i}'] = {'id': f'ib_{i}', 'x': x - ox, 'y': y - oy, 'label': s['name'], 'is_station': True}
+
+    def nd(nid: str) -> dict:
+        return nodes[nid]
+
+    # ── edges ──
+    def _edge_len(ax, ay, bx, by) -> float:
+        return round(math.hypot(bx - ax, by - ay), 2) or 1.0
+
+    ob_edges, ib_edges = [], []
+    for i in range(n - 1):
+        j = i + 1
+        a, b = nd(f'ob_{i}'), nd(f'ob_{j}')
+        ob_edges.append({
+            'id': f'ob_{i}_{j}', 'from_node': f'ob_{i}', 'to_node': f'ob_{j}',
+            'block_id': f'OB_B{i + 1}',
+            'points': [{'x': a['x'], 'y': a['y']}, {'x': b['x'], 'y': b['y']}],
+            'length': _edge_len(a['x'], a['y'], b['x'], b['y']),
         })
-    return sigs
+        a, b = nd(f'ib_{j}'), nd(f'ib_{i}')
+        ib_edges.append({
+            'id': f'ib_{j}_{i}', 'from_node': f'ib_{j}', 'to_node': f'ib_{i}',
+            'block_id': f'IB_B{j}',
+            'points': [{'x': a['x'], 'y': a['y']}, {'x': b['x'], 'y': b['y']}],
+            'length': _edge_len(a['x'], a['y'], b['x'], b['y']),
+        })
+
+    # terminus crossovers (Vaughan MC end and Finch end)
+    def _xover(eid, fn, tn) -> dict:
+        a, b = nd(fn), nd(tn)
+        return {
+            'id': eid, 'from_node': fn, 'to_node': tn, 'block_id': f'XOVER_{eid.upper()}',
+            'points': [{'x': a['x'], 'y': a['y']}, {'x': b['x'], 'y': b['y']}],
+            'length': _edge_len(a['x'], a['y'], b['x'], b['y']) or 10.0,
+        }
+
+    xovers = [
+        _xover('xover_start', f'ib_0',     f'ob_0'),
+        _xover('xover_end',   f'ob_{n-1}', f'ib_{n-1}'),
+    ]
+
+    all_edges = ob_edges + ib_edges + xovers
+
+    # ── signals (one per revenue edge, 8 % from start) ──
+    signals = []
+    for e in ob_edges + ib_edges:
+        p0, p1, t = e['points'][0], e['points'][-1], 0.08
+        signals.append({
+            'id': f"sig_{e['id']}", 'edge_id': e['id'], 'offset': t,
+            'position': {'x': p0['x'] + t*(p1['x']-p0['x']), 'y': p0['y'] + t*(p1['y']-p0['y'])},
+            'aspect': 'green', 'block_id': e['block_id'],
+        })
+
+    # ── bounds ──
+    xs = [v['x'] for v in nodes.values()]
+    ys = [v['y'] for v in nodes.values()]
+    bounds = {'min_x': min(xs) - _PAD, 'min_y': min(ys) - _PAD,
+              'max_x': max(xs) + _PAD, 'max_y': max(ys) + _PAD}
+
+    # ── train route (for position mapping in main.py) ──
+    train_route = (
+        [f'ob_{i}_{i+1}' for i in range(n - 1)] +
+        ['xover_end'] +
+        [f'ib_{j}_{j-1}' for j in range(n - 1, 0, -1)] +
+        ['xover_start']
+    )
+
+    topology = {
+        'nodes':      list(nodes.values()),
+        'edges':      all_edges,
+        'switches': [
+            {'id': 'sw_start', 'node_id': f'ob_0',     'normal_edge_id': f'ob_0_1',         'reverse_edge_id': 'xover_start', 'state': 'normal'},
+            {'id': 'sw_end',   'node_id': f'ob_{n-1}', 'normal_edge_id': f'ob_{n-2}_{n-1}', 'reverse_edge_id': 'xover_end',   'state': 'normal'},
+        ],
+        'crossovers': [
+            {'id': 'xov_start', 'edge1_id': f'ob_0_1',         'edge2_id': f'ib_1_0',         'node_id': f'ob_0'},
+            {'id': 'xov_end',   'edge1_id': f'ob_{n-2}_{n-1}', 'edge2_id': f'ib_{n-1}_{n-2}', 'node_id': f'ob_{n-1}'},
+        ],
+        'signals':    signals,
+        'bounds':     bounds,
+    }
+    return topology, train_route
 
 
-YUS_TOPOLOGY: dict = {
-    'nodes': [
-        *[{'id': f'nb_{i}', 'x': _STATION_X[i], 'y': _NB_Y, 'label': _STATION_NAMES[i], 'is_station': True} for i in range(7)],
-        *[{'id': f'sb_{i}', 'x': _STATION_X[i], 'y': _SB_Y, 'label': _STATION_NAMES[i], 'is_station': True} for i in range(7)],
-    ],
-    'edges': _all_edges,
-    'switches': [
-        {'id': 'sw_north',  'node_id': 'nb_6', 'normal_edge_id': 'xover_north',     'reverse_edge_id': 'xover_north',     'state': 'normal'},
-        {'id': 'sw_south',  'node_id': 'sb_0', 'normal_edge_id': 'xover_south',     'reverse_edge_id': 'xover_south',     'state': 'normal'},
-        {'id': 'sw_mid_nb', 'node_id': 'nb_3', 'normal_edge_id': 'nb_34',           'reverse_edge_id': 'xover_mid_nb_sb', 'state': 'normal'},
-        {'id': 'sw_mid_sb', 'node_id': 'sb_3', 'normal_edge_id': 'sb_32',           'reverse_edge_id': 'xover_mid_nb_sb', 'state': 'normal'},
-    ],
-    'crossovers': [
-        {'id': 'xov_north', 'edge1_id': 'nb_56', 'edge2_id': 'sb_65', 'node_id': 'nb_6'},
-        {'id': 'xov_south', 'edge1_id': 'sb_10', 'edge2_id': 'nb_01', 'node_id': 'sb_0'},
-        {'id': 'xov_mid',   'edge1_id': 'nb_34', 'edge2_id': 'sb_32', 'node_id': 'nb_3'},
-    ],
-    'signals': _make_signals(),
-    'bounds': {'min_x': -80, 'min_y': 0, 'max_x': 3700, 'max_y': 100},
-}
+YUS_TOPOLOGY, YUS_TRAIN_ROUTE = _build_yus()
 
 
 def get_topology_document(line_id: str) -> dict:
