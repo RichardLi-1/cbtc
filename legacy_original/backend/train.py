@@ -2,6 +2,8 @@ from sim import DT
 from bisect import bisect_right
 from dataclasses import dataclass
 from time import sleep
+from typing import Any
+import json
 
 @dataclass
 class TrainCommand:
@@ -98,7 +100,7 @@ class Line:
             #if there is a train ahead
             if i>0:
                 self.calculateSafeDistance(self.trains[i], self.trains[i-1])
-            sleep(DT/3)
+        sleep(DT/3)
         print(self.name + " stepped")
         self.dispatchTrain()
 
@@ -126,10 +128,35 @@ class Line:
         return safe_distance
 
 
+def getState():
+    states = []
+    for line in lines:
+        line_obj = {
+            "name": line.name,
+            "trains": [
+                {
+                    "position": train.position,
+                    "speed": train.speed,
+                    "acceleration": train.acceleration,
+                    "acceleration_level": train.acceleration_level,
+                    "direction": train.direction,
+                    "e_brake": train.e_brake,
+                    "run_number": train.run_number,
+                }
+                for train in line.trains
+            ],
+        }
+        states.append(line_obj)
+    payload = [state for state in states]
+    return json.dumps(payload)
 
+global lines
+lines: list['Line'] = []
 
 if __name__ == "__main__":
 
     yus = Line("YUS")
     for i in range(100000):
         yus.step(DT)
+    
+    lines.append(yus)
