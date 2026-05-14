@@ -1,5 +1,18 @@
+# Legacy simulator
+/backend/venv
+/frontend/node_modules
+
+# RL / Python package (under ml/)
+ml/__pycache__/
+ml/**/*.pyc
+ml/.venv/
+ml/runs/
+ml/artifacts/
+
+# Common Python noise
 __pycache__/
 *.pyc
 .venv/
-runs/
-artifacts/
+
+# Editor
+/.vscode

@@ -1,81 +1,61 @@
-# CBTC RL Dispatch System
+# CBTC Simulator
 
-Reinforcement-learning dispatch research environment for CBTC-style subway operations.  
-The project models service dynamics, evaluates dispatch policies against rule-based control, and tracks delay/headway/safety outcomes in repeatable simulation runs.
+Simplified CBTC-style simulation and control-room frontend inspired by TTC operations.
 
-## Features
+## Current status
 
-- Gymnasium-compatible dispatch environment
-- PPO and SAC trainer entry points (via Stable-Baselines3)
-- Rule-based baseline policy for A/B comparison
-- Safety layer hooks for constraint validation and intervention logging
-- Config-driven experiments and scenarios
-- Evaluation and run-to-run comparison commands
+- Backend simulation is Python-based and remains the system-of-record.
+- Frontend is implemented in `frontend/` using React + Canvas.
+- Frontend auto-falls back to mock mode if backend endpoints are unavailable.
 
-## Project Status
+## Repository layout
 
-This repository is in active development. Core package structure and command flows are in place, with additional simulation realism and policy logic being expanded iteratively.
+- `backend/`: simulation domain objects and runtime stepping
+- `frontend/`: dispatch-style UI, camera/viewport, layers, controls
+- `docs/PROJECT.md`: architecture notes and project intent
+- `ml/`: optional RL dispatch research code (Python package, configs, tests); run from that directory
 
-## Getting Started
+## Frontend capabilities (implemented)
 
-### Requirements
+- Dark dispatch panel with layered rendering:
+  - track geometry
+  - block occupancy overlays
+  - switches and crossovers
+  - signals
+  - trains (with direction + safe-zone visualization)
+  - labels
+- Interaction model:
+  - drag to pan
+  - wheel to zoom at cursor
+  - double-click to fit bounds
+  - hover tooltips
+  - click switch/signal to send manual commands
+- Runtime behavior:
+  - state polling (200 ms)
+  - stale-data indicator and API error banner
+  - mock fallback mode when backend is unreachable
 
-- Python 3.10+
-
-### Setup
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### Train a policy
-
-```bash
-python -m rlcbtc.cli.train --config configs/experiments/ppo_baseline.yaml
-```
-
-### Evaluate a run
-
-```bash
-python -m rlcbtc.cli.evaluate --run-dir runs/ppo_baseline/latest
-```
-
-### Compare RL vs baseline
+## Frontend run
 
 ```bash
-python -m rlcbtc.cli.compare --rl-run runs/ppo_baseline/latest --baseline-run runs/rule_based/latest
+cd frontend
+npm install
+npm run dev
 ```
 
-## Repository Layout
+Default dev URL is `http://localhost:5175` (or next free port).
 
-- `rlcbtc/`: simulation, environments, policies, safety, training, evaluation, reporting
-- `configs/`: experiment/scenario/policy/safety/report configuration files
-- `scripts/`: shell wrappers for common train/evaluate/compare/report flows
-- `tests/`: smoke and unit tests
-- `runs/`: generated artifacts and outputs
+## Backend integration contract (frontend-facing)
 
-## Development
+- `GET /topology`
+- `GET /state`
+- `POST /commands/switch/...`
+- `POST /commands/signal/...`
 
-Run tests:
+`vite.config.ts` proxies these paths to `localhost:8000` in development.
 
-```bash
-pytest -q
-```
+## Next recommended steps
 
-Or with Make targets:
-
-```bash
-make train
-make eval
-make test
-make report
-```
-
-## Roadmap
-
-- Expand dispatch environment state/action realism
-- Integrate stronger safety-constraint enforcement
-- Add richer metrics and significance analysis
-- Improve reproducibility and experiment tracking
+- Add Vitest unit tests for geometry helpers.
+- Add one integration test for store + API sync flow.
+- Persist manual signal override behavior in backend state flow.
