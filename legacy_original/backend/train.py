@@ -1,4 +1,4 @@
-from backend.sim import DT
+from sim import DT
 from bisect import bisect_right
 from dataclasses import dataclass
 from time import sleep
@@ -27,12 +27,12 @@ TORONTO_ROCKET_DECELERATION = 1.35
 TORONTO_ROCKET_DECELERATION_EMERGENCY = 1.5
 
 class Train:
-    def __init__(self):
-        self.position = 0.0
+    def __init__(self, position=0.0, direction=1):
+        self.position = position
         self.speed = 0.0
         self.acceleration_level = 0.0 # max -5 to 3. 1 = inch, 2 = series, 3 = parallel
         self.acceleration = 0.0 # m/s^2
-        self.direction = 1 # 1 for forward, -1 for backward
+        self.direction = direction # 1 for forward, -1 for backward
         self.e_brake = False
 
         self.acceleration_curve = TR_ACCELERATION_CURVE
@@ -61,10 +61,23 @@ class Train:
 
         print(f"Speed: {self.speed}, Acceleration: {self.acceleration}")
 
+class Line:
+    def __init__(self):
+        self.trains = []
+
+    def step(self, DT):
+        print("stepped")
+
+    def dispatchTrain(self):
+        newTrain = Train()
+        self.trains.append(newTrain)
+
+
 
 if __name__ == "__main__":
     train1 = Train()
     train1.apply_command(TrainCommand(direction=1, acceleration_level=1, e_brake=False))
     for i in range(100000):
         train1.step(DT)
-        sleep(DT/4)
+        sleep(DT/6)
+
