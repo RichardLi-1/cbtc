@@ -24,21 +24,24 @@ const LIT_SLOT: Record<SignalAspect, number> = {
 
 function SignalLight({ aspect }: { aspect: SignalAspect }) {
   const lit = LIT_SLOT[aspect]
-  const lampColors = [COLORS.SIGNAL_GREEN, COLORS.SIGNAL_YELLOW, COLORS.SIGNAL_RED]
+  const glow = ASPECT_COLORS[aspect]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, background: '#000', borderRadius: 8, padding: '10px 14px' }}>
-      {lampColors.map((col, i) => (
+      {([0, 1, 2] as const).map((i) => {
+        const isLit = i === lit && lit >= 0
+        return (
         <div
           key={i}
           style={{
             width: 28, height: 28, borderRadius: '50%',
-            background: i === lit ? col : '#2a2a2a',
-            boxShadow: i === lit ? `0 0 10px 3px ${col}88` : 'none',
+            background: isLit ? glow : '#2a2a2a',
+            boxShadow: isLit ? `0 0 10px 3px ${glow}88` : 'none',
             transition: 'background 0.15s, box-shadow 0.15s',
           }}
         />
-      ))}
+      )
+      })}
       <div style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 9, fontFamily: 'monospace', marginTop: 2, letterSpacing: '0.06em' }}>
         {aspect.replace('_', ' ').toUpperCase()}
       </div>
