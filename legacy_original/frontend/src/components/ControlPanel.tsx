@@ -125,7 +125,7 @@ export function ControlPanel() {
 
       {/* Train count */}
       <span style={{ color: COLORS.PANEL_TEXT_DIM, fontFamily: 'monospace', fontSize: 11 }}>
-        {runtime?.trains.length ?? 0} trains
+        {runtime?.trains?.length ?? 0} trains
       </span>
     </div>
   )
