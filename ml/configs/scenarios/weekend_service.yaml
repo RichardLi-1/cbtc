@@ -3,5 +3,6 @@ line:
   station_count: 124
 operations:
   daily_train_events: 2210
+  target_headway_sec: 180
 disturbances:
   signal_drops_per_day: 4
