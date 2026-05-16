@@ -6,4 +6,5 @@ class ActionValidator:
         self.constraints = constraints
 
     def is_safe(self, action, state) -> bool:
-        return True
+        speed = float(state.get('speed_mps', 0.0))
+        return speed <= self.constraints.max_speed_mps
