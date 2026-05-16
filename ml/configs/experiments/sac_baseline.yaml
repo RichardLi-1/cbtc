@@ -8,3 +8,6 @@ policy:
   algo: sac
   learning_rate: 3e-4
   buffer_size: 100000
+  tau: 0.005
+  train_freq: 1
+  gradient_steps: 1
