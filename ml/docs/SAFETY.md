@@ -1,6 +1,6 @@
 # Safety framework
 
-- constraint validation
-- shielding
-- fallback action
-- intervention logging
+- constraint validation (`Constraints`: speed, headway, authority buffer)
+- shielding via `ActionShield.apply`
+- fallback action when shield intervenes
+- intervention logging for offline audit
