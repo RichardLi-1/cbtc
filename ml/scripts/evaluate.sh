@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-python -m rlcbtc.cli.evaluate --run-dir "${1:-runs/ppo_baseline/latest}"
+RUN_DIR="${1:-runs/ppo_baseline/latest}"
+python -m rlcbtc.cli.evaluate --run-dir "${RUN_DIR}"
