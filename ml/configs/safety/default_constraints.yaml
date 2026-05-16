@@ -3,3 +3,4 @@ constraints:
   min_headway_sec: 75
   min_authority_buffer_m: 60
   braking_margin_m: 35
+  max_accel_mps2: 1.2
