@@ -87,5 +87,5 @@ make report
 
 - Expand dispatch environment state/action realism
 - Integrate stronger safety-constraint enforcement
-- Add richer metrics and significance analysis
+- Add richer metrics and significance analysis (delay p95 in progress)
 - Improve reproducibility and experiment tracking
