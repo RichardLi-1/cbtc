@@ -1,4 +1,8 @@
-.PHONY: train eval test report
+.PHONY: train eval test report clean
+
+clean:
+	rm -rf runs/.cache __pycache__ .pytest_cache
+	find . -type d -name __pycache__ -prune -exec rm -rf {} +
 
 train:
 	python -m rlcbtc.cli.train --config configs/experiments/ppo_baseline.yaml
