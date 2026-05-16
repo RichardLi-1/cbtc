@@ -8,3 +8,4 @@ operations:
 disturbances:
   signal_drops_per_day: 12
   dwell_time_noise_sec: [0, 25]
+  passenger_surge_probability: 0.08
