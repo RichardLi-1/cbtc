@@ -3,3 +3,5 @@ __pycache__/
 .venv/
 runs/
 artifacts/
+.mypy_cache/
+.ruff_cache/
