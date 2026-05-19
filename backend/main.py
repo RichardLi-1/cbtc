@@ -49,8 +49,10 @@ def get_state():
     for line_data in raw:
         for t in line_data["trains"]:
             eid, offset = chainage_to_edge(t["chainage_front_m"])
-            v_mps = t["speed"] / 3.6
-            brake_dist = (v_mps**2) / (2.0 * 1.5)
+            # Sim stores speed in km/h; API contract (and frontend) use m/s like mock data.
+            speed_kph = float(t["speed"])
+            speed_mps = speed_kph / 3.6
+            brake_dist = (speed_mps**2) / (2.0 * 1.5)
             slack = float(t.get("atp_slack_m") or 0.0)
             trains_out.append(
                 {
@@ -58,7 +60,7 @@ def get_state():
                     "label": f"T{t['run_number']:02d}",
                     "edge_id": eid,
                     "offset": offset,
-                    "speed": t["speed"],
+                    "speed": speed_mps,
                     "state": "e_brake" if t.get("e_brake") else "running",
                     "safe_zone_front": max(10.0 + brake_dist, float(t.get("required_gap_m", 0))),
                     "safe_zone_rear": float(t.get("length_m", 138.0)),

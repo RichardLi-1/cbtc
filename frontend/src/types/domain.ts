@@ -69,6 +69,7 @@ export interface TrainPosition {
   label: string
   edge_id: string
   offset: number
+  /** Metres per second (mock and GET /state). */
   speed: number
   state: TrainState
   safe_zone_front: number
