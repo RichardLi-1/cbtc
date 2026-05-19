@@ -63,6 +63,8 @@ export function tickMockRuntime(dtMs: number): RuntimeState {
       state: 'running' as const,
       safe_zone_front: 350,
       safe_zone_rear: 138,
+      atp_slack_m: 50,
+      authority_eoa_m: null,
     }
   })
 
