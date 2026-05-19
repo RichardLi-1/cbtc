@@ -2,128 +2,13 @@
  * Mock topology + runtime state for UI-only development.
  * Matches the exact shape returned by GET /topology and GET /state.
  */
-import type { Topology, RuntimeState } from '../types/domain'
+import type { RuntimeState } from '../types/domain'
+import { buildYusTopology } from './buildYusTopology'
 
-const NB_Y = 20
-const SB_Y = 80
-const STATION_X = [0, 600, 1200, 1800, 2400, 3000, 3600]
-const STATION_NAMES = ['Finch', 'York Mills', 'Lawrence', 'Eglinton', 'Davisville', 'St. Clair', 'Summerhill']
+const { topology: MOCK_TOPOLOGY, trainRoute: TRAIN_ROUTE } = buildYusTopology()
+export { MOCK_TOPOLOGY }
 
-function nbEdge(i: number) {
-  const [x0, x1] = [STATION_X[i], STATION_X[i + 1]]
-  return {
-    id: `nb_${i}${i + 1}`,
-    from_node: `nb_${i}`,
-    to_node: `nb_${i + 1}`,
-    block_id: `NB_B${i + 1}`,
-    points: [{ x: x0, y: NB_Y }, { x: x1, y: NB_Y }],
-    length: x1 - x0,
-  }
-}
-
-function sbEdge(i: number) {
-  const [x0, x1] = [STATION_X[i], STATION_X[i - 1]]
-  return {
-    id: `sb_${i}${i - 1}`,
-    from_node: `sb_${i}`,
-    to_node: `sb_${i - 1}`,
-    block_id: `SB_B${i}`,
-    points: [{ x: x0, y: SB_Y }, { x: x1, y: SB_Y }],
-    length: Math.abs(x1 - x0),
-  }
-}
-
-const nbEdges = [0, 1, 2, 3, 4, 5].map(nbEdge)
-const sbEdges = [6, 5, 4, 3, 2, 1].map(sbEdge)
-
-const crossovers = [
-  {
-    id: 'xover_north',
-    from_node: 'nb_6',
-    to_node: 'sb_6',
-    block_id: 'XOVER_N',
-    points: [
-      { x: 3600, y: NB_Y },
-      { x: 3660, y: (NB_Y + SB_Y) / 2 },
-      { x: 3600, y: SB_Y },
-    ],
-    length: 130,
-  },
-  {
-    id: 'xover_south',
-    from_node: 'sb_0',
-    to_node: 'nb_0',
-    block_id: 'XOVER_S',
-    points: [
-      { x: 0, y: SB_Y },
-      { x: -60, y: (NB_Y + SB_Y) / 2 },
-      { x: 0, y: NB_Y },
-    ],
-    length: 130,
-  },
-  {
-    id: 'xover_mid_nb_sb',
-    from_node: 'nb_3',
-    to_node: 'sb_3',
-    block_id: 'XOVER_MID',
-    points: [{ x: 1800, y: NB_Y }, { x: 1800, y: SB_Y }],
-    length: SB_Y - NB_Y,
-  },
-]
-
-const allEdges = [...nbEdges, ...sbEdges, ...crossovers]
-
-function makeSignals() {
-  const sigs = []
-  for (const e of [...nbEdges, ...sbEdges]) {
-    const p0 = e.points[0]
-    const p1 = e.points[e.points.length - 1]
-    const t = 0.08
-    sigs.push({
-      id: `sig_${e.id}`,
-      edge_id: e.id,
-      offset: t,
-      position: { x: p0.x + t * (p1.x - p0.x), y: p0.y + t * (p1.y - p0.y) },
-      aspect: 'green' as const,
-      block_id: e.block_id,
-    })
-  }
-  return sigs
-}
-
-export const MOCK_TOPOLOGY: Topology = {
-  nodes: [
-    ...STATION_NAMES.map((label, i) => ({
-      id: `nb_${i}`, x: STATION_X[i], y: NB_Y, label, is_station: true,
-    })),
-    ...STATION_NAMES.map((label, i) => ({
-      id: `sb_${i}`, x: STATION_X[i], y: SB_Y, label, is_station: true,
-    })),
-  ],
-  edges: allEdges,
-  switches: [
-    { id: 'sw_north', node_id: 'nb_6', normal_edge_id: 'xover_north', reverse_edge_id: 'xover_north', state: 'normal' },
-    { id: 'sw_south', node_id: 'sb_0', normal_edge_id: 'xover_south', reverse_edge_id: 'xover_south', state: 'normal' },
-    { id: 'sw_mid_nb', node_id: 'nb_3', normal_edge_id: 'nb_34', reverse_edge_id: 'xover_mid_nb_sb', state: 'normal' },
-    { id: 'sw_mid_sb', node_id: 'sb_3', normal_edge_id: 'sb_32', reverse_edge_id: 'xover_mid_nb_sb', state: 'normal' },
-  ],
-  crossovers: [
-    { id: 'xov_north', edge1_id: 'nb_56', edge2_id: 'sb_65', node_id: 'nb_6' },
-    { id: 'xov_south', edge1_id: 'sb_10', edge2_id: 'nb_01', node_id: 'sb_0' },
-    { id: 'xov_mid', edge1_id: 'nb_34', edge2_id: 'sb_32', node_id: 'nb_3' },
-  ],
-  signals: makeSignals(),
-  bounds: { min_x: -80, min_y: 0, max_x: 3700, max_y: 100 },
-}
-
-// ── Animated mock runtime ──────────────────────────────────────────────────
-
-const TRAIN_ROUTE = [
-  'nb_01', 'nb_12', 'nb_23', 'nb_34', 'nb_45', 'nb_56',
-  'xover_north',
-  'sb_65', 'sb_54', 'sb_43', 'sb_32', 'sb_21', 'sb_10',
-  'xover_south',
-]
+const allEdges = MOCK_TOPOLOGY.edges
 
 const EDGE_LENGTHS: Record<string, number> = {}
 for (const e of allEdges) EDGE_LENGTHS[e.id] = e.length
@@ -133,7 +18,7 @@ const TOTAL_ROUTE_LEN = TRAIN_ROUTE.reduce((s, eid) => s + (EDGE_LENGTHS[eid] ??
 interface MockTrainState {
   train_id: string
   label: string
-  routeDist: number   // distance along full route (metres)
+  routeDist: number
   speed: number
 }
 
@@ -181,11 +66,9 @@ export function tickMockRuntime(dtMs: number): RuntimeState {
     }
   })
 
-  // Block occupancy
-  const occupiedBlocks = new Set(trains.map(t => {
-    const edge = allEdges.find(e => e.id === t.edge_id)
-    return edge?.block_id ?? ''
-  }))
+  const occupiedBlocks = new Set(
+    trains.map(t => allEdges.find(e => e.id === t.edge_id)?.block_id ?? ''),
+  )
 
   const allBlockIds = [...new Set(allEdges.map(e => e.block_id))]
   const blocks = allBlockIds.map(bid => ({
@@ -193,8 +76,7 @@ export function tickMockRuntime(dtMs: number): RuntimeState {
     occupancy: (occupiedBlocks.has(bid) ? 'occupied' : 'clear') as 'occupied' | 'clear',
   }))
 
-  // Signal aspects derived from occupancy
-  const signals = makeSignals().map(sig => {
+  const signals = MOCK_TOPOLOGY.signals.map(sig => {
     const edgeIdx = TRAIN_ROUTE.indexOf(sig.edge_id)
     const nextEdgeId = TRAIN_ROUTE[(edgeIdx + 1) % TRAIN_ROUTE.length]
     const nextBlock = allEdges.find(e => e.id === nextEdgeId)?.block_id ?? ''

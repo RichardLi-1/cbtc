@@ -1,17 +1,23 @@
-from sim import DT
+"""Train, line, and JSON state — single-line ring with ATP-aware integration."""
+
+from __future__ import annotations
+
+import json
+import math
 from bisect import bisect_right
 from dataclasses import dataclass
-from time import sleep
 from typing import Any
-import json
 
-@dataclass
-class TrainCommand:
-    direction: int
-    acceleration_level: float
-    e_brake: bool = False
-
-#using classes or dataclasses allows for attribute access
+from ma_constants import (
+    EMERGENCY_DECEL_MPS2,
+    KPH_TO_MPS,
+    MPS_TO_KPH,
+    SERVICE_DECEL_MPS2,
+    URBALIS_FIXED_MARGIN_M,
+    URBALIS_GUARANTEED_DECEL_MPS2,
+    URBALIS_MA_CYCLE_S,
+)
+from route_geom import ROUTE_LEN_M, wrap_chainage
 
 TR_ACCELERATION_CURVE = [
     (0, 0.8),
@@ -24,140 +30,175 @@ TR_ACCELERATION_CURVE = [
     (70, 0.2),
     (80, 0.1),
     (88, 0.05),
-]  # speed in kph, acceleration in m/s^2
+]
 
-TORONTO_ROCKET_DECELERATION = 1.35
-TORONTO_ROCKET_DECELERATION_EMERGENCY = 1.5
 
-# Urbalis 400–style moving-block spacing (simplified public CBTC pattern, not OEM data).
-# Required rear→front separation so the follower can stop after MA latency, with a
-# fixed odometry / coupling margin. Uses a single guaranteed emergency deceleration.
-URBALIS_MA_CYCLE_S = 0.5  # MA / comms refresh order of magnitude (~250–500 ms class systems)
-URBALIS_FIXED_MARGIN_M = 10.0  # positioning uncertainty + mechanical buffer (tunable)
-URBALIS_GUARANTEED_DECEL_MPS2 = TORONTO_ROCKET_DECELERATION_EMERGENCY
+@dataclass
+class TrainCommand:
+    direction: int
+    acceleration_level: float
+    e_brake: bool = False
 
-# Curve speed keys are kph; accelerations are m/s². Integrate position in meters.
-KPH_TO_MPS = 1000.0 / 3600.0  # kph → m/s
-MPS_TO_KPH = 3600.0 / 1000.0  # m/s → kph
 
 class Train:
-    def __init__(self, position=0.0, direction=1, run_number=None):
-        self.position = position
+    """Kinematic train on a ring: nose chainage, length, traction curve, ATP slack from zone."""
+
+    def __init__(
+        self,
+        chainage_front_m: float = 0.0,
+        direction: int = 1,
+        run_number: int | None = None,
+        length_m: float = 138.0,
+    ) -> None:
+        self.chainage_front_m = float(chainage_front_m)
+        self.length_m = float(length_m)
         self.speed = 0.0  # kph
-        self.acceleration_level = 0.0 # max -5 to 3. 1 = inch, 2 = series, 3 = parallel
-        self.acceleration = 0.0 # m/s^2
-        self.direction = direction # 1 for forward, -1 for backward
+        self.acceleration_level = 0.0
+        self.acceleration = 0.0  # m/s^2 (signed)
+        self.direction = direction
         self.e_brake = False
         self.run_number = run_number
-
         self.acceleration_curve = TR_ACCELERATION_CURVE
 
+        self.leader_run_number: int | None = None
+        self.gap_to_leader_m: float = 0.0
+        self.required_gap_m: float = 0.0
+        self.atp_slack_m: float = float("inf")
+        self.authority_eoa_m: float = 0.0
 
-    def apply_command(self, command):
-        self.direction = command.direction
-        self.e_brake = command.e_brake
-        self.acceleration_level = command.acceleration_level
+    @property
+    def position(self) -> float:
+        """Backward-compat: nose chainage (m) along the loop."""
+        return self.chainage_front_m
 
-    def step(self, DT): # THIS IS HOW THE TRAIN STEPS ITS STATE
+    @position.setter
+    def position(self, value: float) -> None:
+        self.chainage_front_m = float(value)
 
-        self.position += (self.speed * KPH_TO_MPS) * DT * self.direction
-        self.speed += self.acceleration * DT * MPS_TO_KPH
+    def apply_command(self, command: TrainCommand) -> None:
+        self.direction = int(command.direction)
+        self.e_brake = bool(command.e_brake)
+        self.acceleration_level = float(command.acceleration_level)
 
-        speeds = [speed for speed, _ in self.acceleration_curve] # _ to ignore value
+    def _traction_accel(self) -> float:
+        """Signed acceleration from notch (positive = traction along direction)."""
+        lvl = self.acceleration_level
+        if self.direction < 0:
+            lvl = -lvl
+
+        if lvl < 0:
+            return -SERVICE_DECEL_MPS2 * min(1.0, abs(lvl) / 5.0)
+
+        speeds = [s for s, _ in self.acceleration_curve]
         x0 = bisect_right(speeds, self.speed) - 1
         x1 = x0 + 1 if x0 < len(speeds) - 1 else x0
-
-        if x0 == x1: #if the speed is past the highest point on acceleration curve
-            self.acceleration = 0
+        if x0 == x1:
+            base = 0.0
         else:
-            s0 = speeds[x0]
-            s1 = speeds[x1]
-            fx0 = self.acceleration_curve[x0][1]
-            fx1 = self.acceleration_curve[x1][1]
-            self.acceleration = (fx0 + ((fx1-fx0)/(s1-s0))*(self.speed-s0)) * (self.acceleration_level/3.0)
+            s0, s1 = speeds[x0], speeds[x1]
+            fx0, fx1 = self.acceleration_curve[x0][1], self.acceleration_curve[x1][1]
+            base = fx0 + ((fx1 - fx0) / (s1 - s0)) * (self.speed - s0)
+        return base * min(1.0, lvl / 3.0)
 
-        #calculate acceleration using existing speed, acceleration curve, and acceleration level
+    def _atp_accel_cap(self) -> float:
+        """Returns a finite acceleration cap when ATP demands deceleration (max() with caps)."""
+        slack = getattr(self, "atp_slack_m", float("inf"))
+        if slack is None or math.isinf(slack):
+            return float("inf")
+        v_mps = abs(self.speed) * KPH_TO_MPS
+        if slack <= 0:
+            return -EMERGENCY_DECEL_MPS2
+        br = (v_mps * v_mps) / (2.0 * EMERGENCY_DECEL_MPS2) if EMERGENCY_DECEL_MPS2 > 0 else 0.0
+        if slack < br + 2.0:
+            return -EMERGENCY_DECEL_MPS2
+        if slack < br + 15.0:
+            return -SERVICE_DECEL_MPS2
+        return float("inf")
 
-        print(
-            f"Run {self.run_number} at "
-            f"Position: {self.position} m, "
-            f"Speed: {self.speed} kph, "
-            f"Acceleration: {self.acceleration} m/s^2"
+    def step(self, dt: float, route_len: float = ROUTE_LEN_M) -> None:
+        if dt <= 0:
+            return
+
+        v_mps = self.speed * KPH_TO_MPS * self.direction
+
+        if self.e_brake:
+            a = -EMERGENCY_DECEL_MPS2 * (1 if self.direction >= 0 else -1)
+        else:
+            a_cmd = self._traction_accel()
+            cap = self._atp_accel_cap()
+            if math.isfinite(cap):
+                a = min(a_cmd, cap) if cap < a_cmd else a_cmd
+            else:
+                a = a_cmd
+
+        self.acceleration = float(a)
+        v_mps_next = v_mps + self.acceleration * dt
+        if self.direction >= 0 and v_mps_next < 0:
+            v_mps_next = 0.0
+        if self.direction < 0 and v_mps_next > 0:
+            v_mps_next = 0.0
+
+        v_avg = 0.5 * (v_mps + v_mps_next)
+        self.chainage_front_m = wrap_chainage(
+            self.chainage_front_m + v_avg * dt * self.direction, route_len
         )
+        self.speed = abs(v_mps_next) * MPS_TO_KPH
+
 
 class Line:
-    def __init__(self, name):
-        self.trains = []
+    def __init__(self, name: str, trains: list[Train]) -> None:
         self.name = name
-        
-        self.dispatchTrain()
+        self.trains = trains
 
 
-    def step(self, DT):
-        for i in range(len(self.trains)):
-            self.trains[i].step(DT)
-            
-            #if there is a train ahead
-            if i>0:
-                self.calculateSafeDistance(self.trains[i], self.trains[i-1])
-        sleep(DT/3)
-        print(self.name + " stepped")
-        self.dispatchTrain()
-
-    def dispatchTrain(self):
-        newTrain = Train(0.1, 1, len(self.trains))
-        newTrain.apply_command(TrainCommand(direction=1, acceleration_level=1, e_brake=False))
-        self.trains.append(newTrain)
-
-    def calculateSafeDistance(self, train: Train, trainInFront: Train) -> float:
-        """Minimum follower→leader separation (m), Urbalis-style moving-block sketch."""
-        v_rear_mps = train.speed * KPH_TO_MPS
-        v_front_mps = trainInFront.speed * KPH_TO_MPS
-        a = URBALIS_GUARANTEED_DECEL_MPS2
-        # Braking distance from current speed if MA ends now (v² = 2as).
-        d_brake_rear = (v_rear_mps * v_rear_mps) / (2.0 * a) if a > 0 else 0.0
-        # During one MA cycle, net gap closure if rear is faster than front.
-        d_close = max(0.0, v_rear_mps - v_front_mps) * URBALIS_MA_CYCLE_S
-        safe_distance = URBALIS_FIXED_MARGIN_M + d_close + d_brake_rear
-
-        gap_m = trainInFront.position - train.position
-        print(
-            f"safe_distance_req={safe_distance:.1f} m "
-            f"(gap={gap_m:.1f} m, v_rear={train.speed:.1f} kph, v_front={trainInFront.speed:.1f} kph)"
-        )
-        return safe_distance
+def _make_initial_roster(route_len: float, num_trains: int = 4) -> list[Train]:
+    trains: list[Train] = []
+    n = max(1, num_trains)
+    for i in range(n):
+        s = (route_len * i / n) % route_len
+        t = Train(chainage_front_m=s, direction=1, run_number=i, length_m=138.0)
+        t.apply_command(TrainCommand(direction=1, acceleration_level=2.0, e_brake=False))
+        trains.append(t)
+    return trains
 
 
-def getState():
+def getState() -> str:
     states = []
     for line in lines:
-        line_obj = {
+        line_obj: dict[str, Any] = {
             "name": line.name,
             "trains": [
                 {
-                    "position": train.position,
+                    "chainage_front_m": train.chainage_front_m,
+                    "position": train.chainage_front_m,
+                    "length_m": train.length_m,
                     "speed": train.speed,
                     "acceleration": train.acceleration,
                     "acceleration_level": train.acceleration_level,
                     "direction": train.direction,
                     "e_brake": train.e_brake,
                     "run_number": train.run_number,
+                    "leader_run_number": train.leader_run_number,
+                    "gap_to_leader_m": train.gap_to_leader_m,
+                    "required_gap_m": train.required_gap_m,
+                    "atp_slack_m": train.atp_slack_m,
+                    "authority_eoa_m": train.authority_eoa_m,
                 }
                 for train in line.trains
             ],
         }
         states.append(line_obj)
-    payload = [state for state in states]
-    return json.dumps(payload)
+    return json.dumps(states)
 
-def _init_lines() -> list['Line']:
-    yus = Line("YUS")
-    for _ in range(3):
-        yus.dispatchTrain()
-    return [yus]
 
-lines: list['Line'] = _init_lines()
+def _default_line() -> Line:
+    return Line("YUS", _make_initial_roster(ROUTE_LEN_M, num_trains=4))
+
+
+lines: list[Line] = [_default_line()]
 
 if __name__ == "__main__":
-    for i in range(100000):
-        lines[0].step(DT)
+    from sim import DT, simulation
+
+    for _ in range(100000):
+        simulation.step(DT)

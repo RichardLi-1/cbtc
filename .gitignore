@@ -1,6 +1,8 @@
 # Legacy simulator
 /backend/venv
 /frontend/node_modules
+/frontend/dist
+/frontend/.wrangler
 
 # RL / Python package (under ml/)
 ml/__pycache__/

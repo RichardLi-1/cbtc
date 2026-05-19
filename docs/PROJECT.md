@@ -1,6 +1,8 @@
 # CBTC simulator — project notes
 
-**Last updated:** 2026-05-05
+**Repo path:** `docs/PROJECT.md` — architectural intent and roadmap for the CBTC sim (the root `README.md` is the short entry; **this** file is the longer-lived design note).
+
+**Last updated:** 2026-05-14
 
 ## Framing
 
@@ -81,6 +83,23 @@ Goal: turn “rerun until we reproduce the bug” into targeted triage — scrub
 
 - **Reinforcement learning** is the most natural “late or optional” layer: classical ATO + sim + comparison story can ship without RL first.
 - “Full ML” is not the immediate core; **RL** was called out as the first thing to drop under pressure, then re-add when the sim is trustworthy.
+
+### Backend sim (`backend/train.py`) — concepts to implement next
+
+Ordered roughly by dependency. Goal: move from kinematics + **printed** Urbalis-style spacing to real **ATP-style** behaviour (authority and enforcement).
+
+- **Track / chainage** — Absolute position along a line, segment lengths, direction of travel, so “ahead” is topology-based, not list order.
+- **Train length / endpoints** — Separate **rear** vs **front** (or odometry reference) for spacing and platform stopping.
+- **Movement authority (MA) / EOA** — Explicit limit the train must not pass; refreshed on a cycle; drives protection instead of only comparing to the train in front.
+- **Braking / speed envelope** — ATP curve: max allowed speed vs distance to EOA (and to preceding train’s safe point); **clip traction** or **command brake** when `gap < required`.
+- **Wire safe distance into control** — Today `calculateSafeDistance` only logs; next step is **feedback**: reduce `acceleration_level`, force service brake, or trip **e_brake** when violated.
+- **Stations / berths** — Stopping targets as data (chainage + optional multiple berths); EOA often ends at berth for normal stops.
+- **Station standstill / minimum margin** — Floor separation at low speed; optional **release** logic when both trains are stopped (still non-zero margin).
+- **Dispatcher / spawn model** — Replace ad-hoc per-step spawning with **headway**, **terminal turnaround**, or **timetable-driven** inserts.
+- **State API hygiene** — `getState()` without unbounded `print` in the hot path; deterministic stepping for tests.
+- **Zone controller (optional)** — One object that owns MAs for all trains on a line, closer to a vendor split: wayside vs onboard.
+
+**Related code elsewhere:** the `ml/rlcbtc/` package has a richer world model, safety shield, and line model; map new backend concepts to those modules if you want one coherent stack.
 
 ---
 

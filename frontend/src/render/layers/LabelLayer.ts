@@ -2,7 +2,7 @@ import type { Topology } from '../../types/domain'
 import type { Viewport } from '../Viewport'
 import { COLORS } from '../../constants/colors'
 
-const NB_Y_LABEL_OFFSET = -18   // screen px above track
+const OB_LABEL_OFFSET = -18   // screen px above outbound track
 
 export function renderLabelLayer(
   ctx: CanvasRenderingContext2D,
@@ -21,9 +21,9 @@ export function renderLabelLayer(
     const [sx, sy] = vp.worldToScreen(node.x, node.y)
     if (sx < -60 || sx > vp.width + 60) continue
 
-    // Only label on NB track to avoid duplication
-    if (node.id.startsWith('nb_')) {
-      ctx.fillText(node.label, sx, sy + NB_Y_LABEL_OFFSET)
+    // Only label on outbound track to avoid duplication
+    if (node.id.startsWith('ob_')) {
+      ctx.fillText(node.label, sx, sy + OB_LABEL_OFFSET)
       seen.add(node.label)
     }
   }
