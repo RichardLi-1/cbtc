@@ -27,6 +27,11 @@ def forward_distance(chainage_from: float, chainage_to: float, route_len: float 
     return float(d)
 
 
+def ahead_of_berth_m(train_front_m: float, berth_m: float, route_len: float = ROUTE_LEN_M) -> float:
+    """Metres the train nose is past the berth along the forward direction (0 until passed)."""
+    return forward_distance(berth_m, train_front_m, route_len)
+
+
 def chainage_to_edge(chainage: float, route_len: float = ROUTE_LEN_M) -> tuple[str, float]:
     """Map wrapped chainage (m) to topology edge id and parametric offset along that edge in [0,1]."""
     dist = wrap_chainage(chainage, route_len)
