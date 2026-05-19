@@ -5,16 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ma_constants import KPH_TO_MPS, SERVICE_DECEL_MPS2
-from route_geom import forward_distance
+from route_geom import ROUTE_LEN_M, ahead_of_berth_m, forward_distance
 from stations import StationBerth, YUS_BERTHS
 from train import Train, TrainCommand
 
-# Tunables (operations layer — later from DB / config).
 DEFAULT_DWELL_SEC = 18.0
-STOP_TOLERANCE_M = 15.0
-CREEP_SPEED_KPH = 4.0
-APPROACH_RADIUS_M = 700.0
-APPROACH_SPEED_KPH = 40.0
+STOP_TOLERANCE_M = 20.0
+CREEP_SPEED_KPH = 5.0
+APPROACH_RADIUS_M = 550.0
+APPROACH_SPEED_KPH = 35.0
+PASSED_SNAP_AHEAD_M = 8.0  # nose this far past berth → treat as fly-by, snap back
 CRUISE_NOTCH = 2.0
 BRAKE_NOTCH = -3.5
 
@@ -39,12 +39,11 @@ class AtoController:
         cfg: AtoConfig | None = None,
     ) -> None:
         self.berths = berths if berths is not None else YUS_BERTHS
-        self.route_len_m = route_len_m if route_len_m is not None else _route_len_from_berths()
+        self.route_len_m = route_len_m if route_len_m is not None else ROUTE_LEN_M
         self.cfg = cfg or AtoConfig()
 
     def ensure_train_state(self, train: Train) -> None:
         if not hasattr(train, "stop_index"):
-            # Stagger targets so four trains don't share the same berth.
             n = len(self.berths)
             train.stop_index = (train.run_number or 0) * (n // 4) % max(n, 1)
         if not hasattr(train, "dwell_remaining_sec"):
@@ -60,8 +59,15 @@ class AtoController:
     def apply_commands(self, trains: list[Train]) -> None:
         for tr in trains:
             self.ensure_train_state(tr)
-            cmd = self._command_for(tr)
-            tr.apply_command(cmd)
+            tr.apply_command(self._command_for(tr))
+
+    def _latch_dwell(self, train: Train, berth: StationBerth) -> TrainCommand:
+        train.dwell_remaining_sec = self.cfg.dwell_sec
+        train.at_station_name = berth.name
+        train.speed = 0.0
+        train.chainage_front_m = berth.chainage_m
+        train._ato_dist_to_berth_m = 0.0
+        return TrainCommand(train.direction, 0.0, e_brake=False)
 
     def _command_for(self, train: Train) -> TrainCommand:
         if train.e_brake:
@@ -72,50 +78,42 @@ class AtoController:
 
         berth = self.target_berth(train)
         dist = forward_distance(train.chainage_front_m, berth.chainage_m, self.route_len_m)
+        ahead = ahead_of_berth_m(train.chainage_front_m, berth.chainage_m, self.route_len_m)
         v = train.speed
         prev_dist = float(train._ato_dist_to_berth_m)
+
+        # Flew past without dwelling: distance-to-berth jumps to ~full loop; snap-stop anyway.
+        if ahead > PASSED_SNAP_AHEAD_M or (prev_dist < 120.0 and dist > prev_dist + 200.0 and v > 8.0):
+            return self._latch_dwell(train, berth)
+
         train._ato_dist_to_berth_m = dist
 
-        # Overshot platform: target next station on the loop.
-        if prev_dist < 80.0 and dist > prev_dist + 20.0 and v > 15.0:
-            train.stop_index = (train.stop_index + 1) % len(self.berths)
-            berth = self.target_berth(train)
-            dist = forward_distance(train.chainage_front_m, berth.chainage_m, self.route_len_m)
-            train._ato_dist_to_berth_m = dist
+        capture = self.cfg.stop_tolerance_m + max(v * KPH_TO_MPS * 0.8, 10.0)
 
-        capture = self.cfg.stop_tolerance_m + max(v * KPH_TO_MPS * 0.6, 8.0)
-
-        # At platform: latch dwell once slow enough and inside capture envelope.
-        if dist <= capture and v <= CREEP_SPEED_KPH * 2.5:
-            train.dwell_remaining_sec = self.cfg.dwell_sec
-            train.at_station_name = berth.name
-            train.speed = 0.0
-            train.chainage_front_m = berth.chainage_m
-            return TrainCommand(train.direction, 0.0, e_brake=False)
+        if dist <= capture and v <= CREEP_SPEED_KPH * 3.0:
+            return self._latch_dwell(train, berth)
 
         brake_dist = _brake_distance_m(v)
-        margin = 30.0
+        margin = 40.0
 
         if dist <= brake_dist + margin:
-            # Service brake — stronger as we get closer.
-            if dist <= brake_dist + 5.0:
+            if dist <= brake_dist + 8.0:
                 notch = BRAKE_NOTCH
-            elif dist <= brake_dist + 15.0:
-                notch = -2.5
+            elif dist <= brake_dist + 20.0:
+                notch = -2.8
             else:
-                notch = -1.5
+                notch = -2.0
             return TrainCommand(train.direction, notch, e_brake=False)
 
         if dist < APPROACH_RADIUS_M:
             if v > APPROACH_SPEED_KPH:
-                return TrainCommand(train.direction, -1.0, e_brake=False)
-            if dist < 250.0 and v > 22.0:
-                return TrainCommand(train.direction, -2.0, e_brake=False)
+                return TrainCommand(train.direction, -1.5, e_brake=False)
+            if dist < 300.0 and v > 20.0:
+                return TrainCommand(train.direction, -2.5, e_brake=False)
 
         return TrainCommand(train.direction, self.cfg.cruise_notch, e_brake=False)
 
     def tick_dwell(self, train: Train, dt: float) -> None:
-        """Call after physics step to advance dwell timer and release to next station."""
         if train.dwell_remaining_sec <= 0:
             return
         train.dwell_remaining_sec = max(0.0, train.dwell_remaining_sec - dt)
@@ -123,9 +121,4 @@ class AtoController:
         if train.dwell_remaining_sec <= 0:
             train.stop_index = (train.stop_index + 1) % len(self.berths)
             train.at_station_name = ""
-
-
-def _route_len_from_berths() -> float:
-    from route_geom import ROUTE_LEN_M
-
-    return ROUTE_LEN_M
+            train._ato_dist_to_berth_m = float("inf")
