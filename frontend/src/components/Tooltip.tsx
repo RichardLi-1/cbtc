@@ -56,13 +56,21 @@ function entityDetail(hovered: HoveredEntity, topology: Topology, runtime: Runti
   if (kind === 'train') {
     const t = runtime.trains.find(t => t.train_id === id)
     if (!t) return [id]
-    return [
+    const lines = [
       `Train  ${t.label}`,
       `Edge   ${t.edge_id}  @${(t.offset * 100).toFixed(1)}%`,
       `Speed  ${(t.speed * 3.6).toFixed(1)} km/h`,
       `State  ${t.state}`,
       `Fwd    ${t.safe_zone_front.toFixed(0)} m`,
     ]
+    if (t.atp_slack_m != null) {
+      const sign = t.atp_slack_m < 0 ? '' : '+'
+      lines.push(`Slack  ${sign}${t.atp_slack_m.toFixed(1)} m`)
+    }
+    if (t.authority_eoa_m != null) {
+      lines.push(`EOA    ${(t.authority_eoa_m / 1000).toFixed(2)} km`)
+    }
+    return lines
   }
   if (kind === 'signal') {
     const topo = topology.signals.find(s => s.id === id)
@@ -103,11 +111,23 @@ export function Tooltip({ hovered, topology, runtime }: Props) {
       }}
     >
       {isSignal && <SignalLight aspect={aspect} />}
-      {lines.map((l, i) => (
-        <div key={i} style={{ color: i === 0 ? COLORS.PANEL_TEXT : COLORS.PANEL_TEXT_DIM, fontSize: 11, fontFamily: 'monospace', lineHeight: '1.6' }}>
-          {l}
-        </div>
-      ))}
+      {lines.map((l, i) => {
+        let color: string = i === 0 ? COLORS.PANEL_TEXT : COLORS.PANEL_TEXT_DIM
+        if (l.startsWith('Slack')) {
+          const m = l.match(/-?\d+(\.\d+)?/)
+          const n = m ? parseFloat(m[0]) : NaN
+          if (Number.isFinite(n)) {
+            if (n < 0) color = COLORS.SIGNAL_RED
+            else if (n < 15) color = COLORS.SIGNAL_FLASHING_YELLOW
+            else color = COLORS.SIGNAL_GREEN
+          }
+        }
+        return (
+          <div key={i} style={{ color, fontSize: 11, fontFamily: 'monospace', lineHeight: '1.6' }}>
+            {l}
+          </div>
+        )
+      })}
     </div>
   )
 }

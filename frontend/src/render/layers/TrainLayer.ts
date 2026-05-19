@@ -2,6 +2,7 @@ import type { Topology, RuntimeState, TrainPosition } from '../../types/domain'
 import type { Viewport } from '../Viewport'
 import { COLORS } from '../../constants/colors'
 import { interpolatePolyline, tangentAtT } from '../../utils/geometry'
+import { safeZonePalette, slackTier } from '../../utils/safeZone'
 
 const TRAIN_W = 18   // screen px (half-width)
 const TRAIN_H = 5    // screen px (half-height)
@@ -33,26 +34,38 @@ export function renderTrainLayer(
     const angle = Math.atan2(tan.y, tan.x)
 
     // ── Safe zone orbs ────────────────────────────────────────────────────
+    const tier = slackTier(train.atp_slack_m)
     if (showSafeZones) {
       const frontPx = vp.toPixels(train.safe_zone_front)
       const rearPx  = vp.toPixels(train.safe_zone_rear)
 
-      // Front oval — elongated along track, fades from train outward
+      // Front oval — elongated along track, fades from train outward.
+      // Color shifts amber/red when ATP slack tightens.
       if (frontPx > 6) {
         const halfH = Math.max(6, Math.min(14, frontPx * 0.09))
+        const pal = safeZonePalette(train.atp_slack_m)
         ctx.save()
         ctx.translate(sx, sy)
         ctx.rotate(angle)
-        // ellipse: origin at train, extends forward only (x: 0 → frontPx)
         const gf = ctx.createLinearGradient(0, 0, frontPx, 0)
-        gf.addColorStop(0,    'rgba(40, 160, 255, 0.55)')
-        gf.addColorStop(0.30, 'rgba(30, 120, 255, 0.28)')
-        gf.addColorStop(0.65, 'rgba(10,  80, 220, 0.10)')
-        gf.addColorStop(1,    'rgba( 0,  40, 200, 0.00)')
+        gf.addColorStop(0,    pal.core)
+        gf.addColorStop(0.30, pal.mid)
+        gf.addColorStop(0.65, pal.edge)
+        gf.addColorStop(1,    pal.ring)
         ctx.beginPath()
         ctx.ellipse(frontPx / 2, 0, frontPx / 2, halfH, 0, 0, Math.PI * 2)
         ctx.fillStyle = gf
         ctx.fill()
+
+        // Danger: outline the orb so a red MA violation pops at a glance.
+        if (tier === 'danger') {
+          const pulse = 0.55 + 0.35 * Math.sin(performance.now() / 140)
+          ctx.beginPath()
+          ctx.ellipse(frontPx / 2, 0, frontPx / 2, halfH, 0, 0, Math.PI * 2)
+          ctx.strokeStyle = `rgba(255, 50, 50, ${pulse.toFixed(3)})`
+          ctx.lineWidth = 1.25
+          ctx.stroke()
+        }
         ctx.restore()
       }
 
@@ -111,6 +124,11 @@ export function renderTrainLayer(
         ctx.fillStyle = COLORS.HUD
         const kmh = (train.speed * 3.6).toFixed(0)
         ctx.fillText(`${kmh} km/h`, sx, sy + TRAIN_H + 10)
+
+        if (tier !== 'nominal' && train.atp_slack_m != null) {
+          ctx.fillStyle = tier === 'danger' ? '#ff5252' : '#ffb74d'
+          ctx.fillText(`Δ ${train.atp_slack_m.toFixed(0)} m`, sx, sy + TRAIN_H + 20)
+        }
       }
       ctx.textAlign = 'left'
       ctx.textBaseline = 'alphabetic'

@@ -111,6 +111,25 @@ useRuntimeStore.subscribe((state) => {
         message: `${t.train_id} ${p.state} → ${t.state}`,
       })
     }
+    // ATP slack edge-triggers: only fire on the crossing, not every tick.
+    if (p && p.atp_slack_m != null && t.atp_slack_m != null) {
+      if (p.atp_slack_m >= 0 && t.atp_slack_m < 0) {
+        append({
+          source: 'wayside', severity: 'error', kind: 'ATP',
+          message: `${t.train_id} authority breached — slack ${t.atp_slack_m.toFixed(1)} m`,
+        })
+      } else if (p.atp_slack_m < 0 && t.atp_slack_m >= 0) {
+        append({
+          source: 'wayside', severity: 'info', kind: 'ATP',
+          message: `${t.train_id} authority recovered`,
+        })
+      } else if (p.atp_slack_m >= 15 && t.atp_slack_m < 15) {
+        append({
+          source: 'wayside', severity: 'warn', kind: 'ATP',
+          message: `${t.train_id} slack tightening — ${t.atp_slack_m.toFixed(1)} m`,
+        })
+      }
+    }
   }
 
   // Switch state changes

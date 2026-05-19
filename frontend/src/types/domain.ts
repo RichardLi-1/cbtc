@@ -73,6 +73,8 @@ export interface TrainPosition {
   state: TrainState
   safe_zone_front: number
   safe_zone_rear: number
+  atp_slack_m?: number
+  authority_eoa_m?: number | null
 }
 
 export interface BlockRuntime {
