@@ -1,0 +1,10 @@
+name: rule_based_smoke
+seed: 42
+total_timesteps: 0
+env:
+  episode_horizon_steps: 120
+  dt_seconds: 1
+policy:
+  algo: rule_based
+safety:
+  shield_enabled: true
