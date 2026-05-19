@@ -5,12 +5,17 @@ import { CanvasView } from './components/CanvasView'
 import { ControlPanel } from './components/ControlPanel'
 import { ConfigPanel } from './components/ConfigPanel'
 import { BackendNotice } from './components/BackendNotice'
+import { InfoPopup } from './components/InfoPopup'
+import { EventsPanel } from './components/EventsPanel'
+import { useUiStore } from './store/uiStore'
+import './store/eventsStore'
 import { COLORS } from './constants/colors'
 
 export default function App() {
   const { load } = useTopologyStore()
   const { startPolling, stopPolling } = useRuntimeStore()
   const [configOpen, setConfigOpen] = useState(false)
+  const { infoOpen, setInfoOpen } = useUiStore()
 
   useEffect(() => {
     load()
@@ -37,7 +42,9 @@ export default function App() {
       <div style={{ position: 'absolute', top: 38, left: 0, right: 0, bottom: 0 }}>
         <CanvasView />
       </div>
+      <EventsPanel />
       <ConfigPanel open={configOpen} />
+      <InfoPopup open={infoOpen} onClose={() => setInfoOpen(false)} />
     </div>
   )
 }

@@ -4,7 +4,8 @@
       "Bash(backend/venv/bin/pip install *)",
       "Bash(npm run *)",
       "Bash(curl -s http://localhost:5173)",
-      "Bash(curl -s http://localhost:5175)"
+      "Bash(curl -s http://localhost:5175)",
+      "Bash(xargs rm -f)"
     ]
   }
 }

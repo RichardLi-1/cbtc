@@ -1,60 +1,44 @@
-import io
+"""FastAPI surface: topology + live sim state (no frontend coupling)."""
+
+from __future__ import annotations
+
 import json
-import contextlib
 import threading
 import time
 
 from fastapi import FastAPI
-import train
+
 import topology
-from sim import DT as _DT
+import train
+from route_geom import ROUTE_LEN_M, chainage_to_edge
+from sim import DT, simulation
 
 app = FastAPI()
 
-# ── Route helpers for position → edge mapping ──────────────────────────────
-
+_EDGES = {e["id"]: e for e in topology.YUS_TOPOLOGY["edges"]}
 _TRAIN_ROUTE = topology.YUS_TRAIN_ROUTE
-_EDGES       = {e['id']: e for e in topology.YUS_TOPOLOGY['edges']}
-_ROUTE_LEN   = sum(_EDGES[eid]['length'] for eid in _TRAIN_ROUTE)
 
-# ── Spread trains evenly around the route and give them initial speed ───────
+# Spread initial roster around the loop at cruise
+if train.lines and train.lines[0].trains:
+    roster = train.lines[0].trains
+    for i, t in enumerate(roster):
+        t.chainage_front_m = ROUTE_LEN_M * i / max(len(roster), 1)
+        t.speed = 55.0
+        t.apply_command(train.TrainCommand(direction=1, acceleration_level=2.5, e_brake=False))
 
-_sim_trains = train.lines[0].trains if train.lines else []
-for _i, _t in enumerate(_sim_trains):
-    _t.position = _ROUTE_LEN * _i / max(len(_sim_trains), 1)
-    _t.speed    = 60.0  # kph, start at cruise speed
-    _t.acceleration_level = 3.0
-
-# ── Background simulation thread ────────────────────────────────────────────
 
 def _sim_loop() -> None:
-    _devnull = io.StringIO()
     while True:
-        with contextlib.redirect_stdout(_devnull):
-            for line in train.lines:
-                for t in line.trains:
-                    t.step(_DT)
-        time.sleep(_DT)
+        simulation.step(DT)
+        time.sleep(DT)
+
 
 threading.Thread(target=_sim_loop, daemon=True).start()
 
 
-def _pos_to_edge(position: float) -> tuple[str, float]:
-    dist = position % _ROUTE_LEN
-    acc = 0.0
-    for eid in _TRAIN_ROUTE:
-        length = _EDGES[eid]['length']
-        if acc + length >= dist:
-            return eid, min(1.0, (dist - acc) / length)
-        acc += length
-    return _TRAIN_ROUTE[0], 0.0
-
-
-# ── Routes ─────────────────────────────────────────────────────────────────
-
 @app.get("/topology")
 def get_topology():
-    return topology.get_topology_document('YUS')
+    return topology.get_topology_document("YUS")
 
 
 @app.get("/state")
@@ -63,43 +47,48 @@ def get_state():
 
     trains_out = []
     for line_data in raw:
-        for t in line_data['trains']:
-            eid, offset = _pos_to_edge(t['position'])
-            v_mps = t['speed'] / 3.6
-            brake_dist = (v_mps ** 2) / (2.0 * 1.5)
-            trains_out.append({
-                'train_id': f"T{t['run_number']:02d}",
-                'label':    f"T{t['run_number']:02d}",
-                'edge_id':  eid,
-                'offset':   offset,
-                'speed':    t['speed'],
-                'state':    'running',
-                'safe_zone_front': 10.0 + brake_dist,
-                'safe_zone_rear':  138.0,
-            })
+        for t in line_data["trains"]:
+            eid, offset = chainage_to_edge(t["chainage_front_m"])
+            v_mps = t["speed"] / 3.6
+            brake_dist = (v_mps**2) / (2.0 * 1.5)
+            slack = float(t.get("atp_slack_m") or 0.0)
+            trains_out.append(
+                {
+                    "train_id": f"T{t['run_number']:02d}",
+                    "label": f"T{t['run_number']:02d}",
+                    "edge_id": eid,
+                    "offset": offset,
+                    "speed": t["speed"],
+                    "state": "e_brake" if t.get("e_brake") else "running",
+                    "safe_zone_front": max(10.0 + brake_dist, float(t.get("required_gap_m", 0))),
+                    "safe_zone_rear": float(t.get("length_m", 138.0)),
+                    "atp_slack_m": slack,
+                    "authority_eoa_m": t.get("authority_eoa_m"),
+                }
+            )
 
-    occupied = {_EDGES[t['edge_id']]['block_id'] for t in trains_out if t['edge_id'] in _EDGES}
+    occupied = {_EDGES[t["edge_id"]]["block_id"] for t in trains_out if t["edge_id"] in _EDGES}
 
     blocks = [
-        {'block_id': bid, 'occupancy': 'occupied' if bid in occupied else 'clear'}
-        for bid in {e['block_id'] for e in topology.YUS_TOPOLOGY['edges']}
+        {"block_id": bid, "occupancy": "occupied" if bid in occupied else "clear"}
+        for bid in {e["block_id"] for e in topology.YUS_TOPOLOGY["edges"]}
     ]
 
-    switches = [{'switch_id': sw['id'], 'state': sw['state']} for sw in topology.YUS_TOPOLOGY['switches']]
+    switches = [{"switch_id": sw["id"], "state": sw["state"]} for sw in topology.YUS_TOPOLOGY["switches"]]
 
     signals = []
-    for sig in topology.YUS_TOPOLOGY['signals']:
-        eid = sig['edge_id']
+    for sig in topology.YUS_TOPOLOGY["signals"]:
+        eid = sig["edge_id"]
         idx = _TRAIN_ROUTE.index(eid) if eid in _TRAIN_ROUTE else -1
-        next_bid = _EDGES[_TRAIN_ROUTE[(idx + 1) % len(_TRAIN_ROUTE)]]['block_id'] if idx >= 0 else ''
-        own_bid  = _EDGES.get(eid, {}).get('block_id', '')
-        aspect = 'red' if own_bid in occupied else ('yellow' if next_bid in occupied else 'green')
-        signals.append({'signal_id': sig['id'], 'aspect': aspect})
+        next_bid = _EDGES[_TRAIN_ROUTE[(idx + 1) % len(_TRAIN_ROUTE)]]["block_id"] if idx >= 0 else ""
+        own_bid = _EDGES.get(eid, {}).get("block_id", "")
+        aspect = "red" if own_bid in occupied else ("yellow" if next_bid in occupied else "green")
+        signals.append({"signal_id": sig["id"], "aspect": aspect})
 
     return {
-        'trains':    trains_out,
-        'blocks':    blocks,
-        'switches':  switches,
-        'signals':   signals,
-        'timestamp': time.time(),
+        "trains": trains_out,
+        "blocks": blocks,
+        "switches": switches,
+        "signals": signals,
+        "timestamp": time.time(),
     }

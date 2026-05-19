@@ -1,6 +1,25 @@
+import { useState, useEffect } from 'react'
 import { useRuntimeStore } from '../store/runtimeStore'
 import { useConnectionStore, type EndpointHealth, type EndpointKey } from '../store/connectionStore'
+import { useUiStore } from '../store/uiStore'
 import { COLORS } from '../constants/colors'
+
+function useWallClock() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  return now
+}
+
+function formatClock(d: Date) {
+  return d.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+}
+
+function formatDate(d: Date) {
+  return d.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: '2-digit' })
+}
 
 interface BtnProps {
   label: string
@@ -58,8 +77,10 @@ export function ControlPanel() {
   const { runtime, stale, commandError, showSafeZones, showLabels, clearCommandError, toggleSafeZones, toggleLabels } =
     useRuntimeStore()
   const { mockMode } = useConnectionStore()
+  const setInfoOpen = useUiStore((s) => s.setInfoOpen)
 
   const ts = runtime?.timestamp?.toFixed(1) ?? '—'
+  const now = useWallClock()
 
   return (
     <div
@@ -81,6 +102,14 @@ export function ControlPanel() {
       {/* Title */}
       <span style={{ color: COLORS.PANEL_TEXT, fontFamily: 'monospace', fontSize: 12, letterSpacing: '0.08em', marginRight: 8 }}>
         CBTC DISPATCH
+      </span>
+
+      {/* Wall clock */}
+      <span style={{ color: COLORS.PANEL_TEXT, fontFamily: 'monospace', fontSize: 12, letterSpacing: '0.06em' }}>
+        {formatClock(now)}
+      </span>
+      <span style={{ color: COLORS.PANEL_TEXT_DIM, fontFamily: 'monospace', fontSize: 11 }}>
+        {formatDate(now)}
       </span>
 
       {/* Sim clock */}
@@ -120,6 +149,7 @@ export function ControlPanel() {
 
       <div style={{ flex: 1 }} />
 
+      <Btn label="INFO" onClick={() => setInfoOpen(true)} />
       <Btn label={showSafeZones ? 'SAFE ZONES ●' : 'SAFE ZONES ○'} active={showSafeZones} onClick={toggleSafeZones} />
       <Btn label={showLabels ? 'LABELS ●' : 'LABELS ○'} active={showLabels} onClick={toggleLabels} />
 
