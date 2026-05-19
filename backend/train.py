@@ -8,6 +8,19 @@ from bisect import bisect_right
 from dataclasses import dataclass
 from typing import Any
 
+
+def _json_safe(obj):
+    if isinstance(obj, float):
+        if math.isinf(obj) or math.isnan(obj):
+            return None
+        return obj
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_json_safe(v) for v in obj]
+    return obj
+
+
 from ma_constants import (
     EMERGENCY_DECEL_MPS2,
     KPH_TO_MPS,
@@ -198,7 +211,7 @@ def getState() -> str:
             ],
         }
         states.append(line_obj)
-    return json.dumps(states)
+    return json.dumps(_json_safe(states))
 
 
 def _default_line() -> Line:

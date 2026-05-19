@@ -3,9 +3,9 @@ import { useConnectionStore, type EndpointKey } from '../store/connectionStore'
 import { COLORS } from '../constants/colors'
 
 const HINTS: Record<EndpointKey, string> = {
-  topology: 'GET /topology — endpoint not implemented in backend (missing route)',
-  state:    'GET /state — backend returned an error (likely NameError: lines not initialised outside __main__)',
-  commands: 'POST /commands/* — endpoint not implemented in backend (missing route)',
+  topology: 'Start backend: cd backend && ./venv/bin/uvicorn main:app --reload --port 8000 (or ./dev.sh from repo root).',
+  state:    'Same as /topology — ensure Vite dev server is running so /state proxies to :8000.',
+  commands: 'POST /commands/switch/{id} and /commands/signal/{id} — backend must be up; click only affects sim when connected.',
 }
 
 export function BackendNotice() {

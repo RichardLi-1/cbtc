@@ -16,6 +16,7 @@ export default defineConfig({
       '/topology': 'http://localhost:8000',
       '/state': 'http://localhost:8000',
       '/commands': 'http://localhost:8000',
+      '/health': 'http://localhost:8000',
     },
   },
 })
