@@ -11,6 +11,7 @@ from fastapi import FastAPI
 import topology
 import train
 from route_geom import ROUTE_LEN_M, chainage_to_edge
+from stations import YUS_BERTHS
 from sim import DT, simulation
 
 app = FastAPI()
@@ -23,8 +24,10 @@ if train.lines and train.lines[0].trains:
     roster = train.lines[0].trains
     for i, t in enumerate(roster):
         t.chainage_front_m = ROUTE_LEN_M * i / max(len(roster), 1)
-        t.speed = 55.0
-        t.apply_command(train.TrainCommand(direction=1, acceleration_level=2.5, e_brake=False))
+        t.speed = 25.0
+        n_berths = len(YUS_BERTHS)
+        t.stop_index = (i * max(n_berths // max(len(roster), 1), 1)) % max(n_berths, 1)
+        t.dwell_remaining_sec = 0.0
 
 
 def _sim_loop() -> None:
@@ -54,6 +57,15 @@ def get_state():
             speed_mps = speed_kph / 3.6
             brake_dist = (speed_mps**2) / (2.0 * 1.5)
             slack = float(t.get("atp_slack_m") or 0.0)
+            dwell = float(t.get("dwell_remaining_sec") or 0.0)
+            if t.get("e_brake"):
+                run_state = "running"
+            elif dwell > 0:
+                run_state = "dwelling"
+            elif speed_kph < 15.0 and dwell == 0 and t.get("at_station_name") in (None, ""):
+                run_state = "arriving"
+            else:
+                run_state = "running"
             trains_out.append(
                 {
                     "train_id": f"T{t['run_number']:02d}",
@@ -61,7 +73,9 @@ def get_state():
                     "edge_id": eid,
                     "offset": offset,
                     "speed": speed_mps,
-                    "state": "e_brake" if t.get("e_brake") else "running",
+                    "state": run_state,
+                    "station_name": t.get("at_station_name") or None,
+                    "dwell_remaining_sec": dwell,
                     "safe_zone_front": max(10.0 + brake_dist, float(t.get("required_gap_m", 0))),
                     "safe_zone_rear": float(t.get("length_m", 138.0)),
                     "atp_slack_m": slack,

@@ -66,6 +66,10 @@ class Train:
         self.atp_slack_m: float = float("inf")
         self.authority_eoa_m: float = 0.0
 
+        self.stop_index: int = 0
+        self.dwell_remaining_sec: float = 0.0
+        self.at_station_name: str = ""
+
     @property
     def position(self) -> float:
         """Backward-compat: nose chainage (m) along the loop."""
@@ -119,6 +123,11 @@ class Train:
         if dt <= 0:
             return
 
+        if self.dwell_remaining_sec > 0:
+            self.speed = 0.0
+            self.acceleration = 0.0
+            return
+
         v_mps = self.speed * KPH_TO_MPS * self.direction
 
         if self.e_brake:
@@ -139,9 +148,7 @@ class Train:
             v_mps_next = 0.0
 
         v_avg = 0.5 * (v_mps + v_mps_next)
-        self.chainage_front_m = wrap_chainage(
-            self.chainage_front_m + v_avg * dt * self.direction, route_len
-        )
+        self.chainage_front_m = wrap_chainage(self.chainage_front_m + v_avg * dt, route_len)
         self.speed = abs(v_mps_next) * MPS_TO_KPH
 
 
@@ -183,6 +190,9 @@ def getState() -> str:
                     "required_gap_m": train.required_gap_m,
                     "atp_slack_m": train.atp_slack_m,
                     "authority_eoa_m": train.authority_eoa_m,
+                    "dwell_remaining_sec": train.dwell_remaining_sec,
+                    "at_station_name": train.at_station_name,
+                    "stop_index": train.stop_index,
                 }
                 for train in line.trains
             ],
