@@ -69,8 +69,9 @@ python -m rlcbtc.cli.train --config configs/experiments/ppo_baseline.yaml
 Artifacts land in `ml/runs/<name>/latest/`:
 
 - `config.json` — frozen experiment config
-- `train.log` — human-readable log
-- `traces/steps.jsonl` — per-step metrics for replay / debugging
+- `train.log` — CLI + runner logs (stderr mirrors this with `-v` for debug)
+- `metrics.jsonl` — PPO training rollout stats (one JSON line per SB3 rollout)
+- `traces/steps.jsonl` — per-step metrics for replay / debugging (every algo after train)
 - `evaluation.json` — aggregates from `evaluation/metrics.py`
 - `policy.zip` — SB3 model (PPO only)
 

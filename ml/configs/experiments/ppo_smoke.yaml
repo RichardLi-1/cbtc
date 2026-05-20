@@ -1,0 +1,14 @@
+name: ppo_smoke
+seed: 42
+total_timesteps: 2048
+eval_episodes: 3
+env:
+  episode_horizon_steps: 60
+  dt_seconds: 1
+policy:
+  algo: ppo
+  learning_rate: 3e-4
+  n_steps: 256
+  batch_size: 64
+safety:
+  shield_enabled: true
