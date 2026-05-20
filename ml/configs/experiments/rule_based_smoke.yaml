@@ -1,6 +1,7 @@
 name: rule_based_smoke
 seed: 42
 total_timesteps: 0
+eval_episodes: 5
 env:
   episode_horizon_steps: 120
   dt_seconds: 1
