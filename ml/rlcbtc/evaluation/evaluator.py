@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-from rlcbtc.envs.dispatch_env import DispatchEnv
-from rlcbtc.evaluation.replay import ReplayLogger
+from rlcbtc.evaluation.rollout import run_rollout
 from rlcbtc.policies.factory import build_policy
-from rlcbtc.utils.config import load_yaml
+from rlcbtc.policies.ppo_policy import PPOPolicyAdapter
+from rlcbtc.utils.logging import get_logger
+
+log = get_logger("evaluator")
 
 
 class Evaluator:
@@ -14,17 +15,23 @@ class Evaluator:
         self.run_dir = Path(run_dir)
         self.episodes = episodes
 
-    def run(self, policy_name: str = "rule_based", env_kwargs: dict | None = None) -> None:
-        env_kwargs = env_kwargs or {}
+    def run(self, policy_name: str = "rule_based", env_kwargs: dict | None = None) -> Path:
         policy = build_policy(policy_name)
-        logger = ReplayLogger(self.run_dir / "eval_traces")
-        for ep in range(self.episodes):
-            env = DispatchEnv(**env_kwargs)
-            obs, _ = env.reset(seed=ep)
-            done = False
-            while not done:
-                action = policy.act(obs)
-                obs, reward, term, trunc, info = env.step(action)
-                logger.log_step(ep, env.t, obs, action, reward, info)
-                done = term or trunc
-        logger.flush_summary(self.run_dir / "evaluation.json")
+        log.info("rollout policy=%s episodes=%s", policy_name, self.episodes)
+        return run_rollout(
+            policy,
+            run_dir=self.run_dir,
+            episodes=self.episodes,
+            env_kwargs=env_kwargs,
+            trace_subdir="eval_traces",
+        )
+
+    def run_ppo(self, model, env_kwargs: dict | None = None) -> Path:
+        log.info("rollout PPO episodes=%s", self.episodes)
+        return run_rollout(
+            PPOPolicyAdapter(model),
+            run_dir=self.run_dir,
+            episodes=self.episodes,
+            env_kwargs=env_kwargs,
+            trace_subdir="eval_traces",
+        )
