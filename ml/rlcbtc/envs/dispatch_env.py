@@ -36,7 +36,6 @@ class DispatchEnv(gym.Env):
             target_headway_sec=target_headway_sec,
         )
         self.t = 0
-        self._last_intervention = False
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32)
         self.observation_space = spaces.Box(
             low=-np.ones(OBS_DIM, dtype=np.float32) * 5.0,
@@ -52,6 +51,7 @@ class DispatchEnv(gym.Env):
             num_trains=6,
             target_headway_sec=120.0,
         )
+        self.engine.refresh_authority()
         obs = build_observation(self.engine)
         return obs, {}
 
@@ -63,10 +63,8 @@ class DispatchEnv(gym.Env):
                 "min_slack_m": self.engine.last_metrics.min_slack_m,
             }
             safe, meta = self.shield.apply(raw, state)
-            self._last_intervention = bool(meta.get("intervened"))
         else:
             safe, meta = raw, {"intervened": False}
-            self._last_intervention = False
 
         self.engine.apply_dispatch_action(safe)
         metrics = self.engine.tick()
@@ -77,6 +75,7 @@ class DispatchEnv(gym.Env):
             delay_sec=metrics.mean_delay_sec,
             headway_var=metrics.headway_std_sec**2,
             violations=metrics.violations,
+            shield_intervened=bool(meta.get("intervened")),
         )
         terminated = self.t >= self.horizon_steps
         truncated = False
