@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rlcbtc.sim.spawn_guard import is_yard_occupied
 from rlcbtc.sim.world import World
 
 
@@ -17,6 +18,8 @@ class HeadwayScheduler:
         if len(world.trains) >= self.max_trains:
             return
         if self._since_spawn_sec < target:
+            return
+        if is_yard_occupied(world):
             return
         self._since_spawn_sec = 0.0
         tid = f"T{len(world.trains):02d}"

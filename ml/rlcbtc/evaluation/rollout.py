@@ -36,5 +36,9 @@ def run_rollout(
             replay.log_step(ep, env.t, obs, action, reward, info)
             done = term or trunc
     summary_path = run_dir / summary_name
-    replay.flush_summary(summary_path)
+    replay.flush_summary(
+        summary_path,
+        seed=seed,
+        shield_enabled=bool(env_kwargs.get("shield_enabled", True)),
+    )
     return summary_path

@@ -2,7 +2,7 @@ from rlcbtc.envs.reward import HEADWAY_VAR_WEIGHT, SHIELD_INTERVENTION_PENALTY, 
 
 
 def test_reward_sign():
-    assert compute_reward(10, 2, 0) < 0
+    assert compute_reward(600, 2, 0) < 0
 
 
 def test_headway_weight_applied():

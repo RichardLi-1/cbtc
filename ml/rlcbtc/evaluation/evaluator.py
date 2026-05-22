@@ -15,23 +15,30 @@ class Evaluator:
         self.run_dir = Path(run_dir)
         self.episodes = episodes
 
-    def run(self, policy_name: str = "rule_based", env_kwargs: dict | None = None) -> Path:
+    def run(
+        self,
+        policy_name: str = "rule_based",
+        env_kwargs: dict | None = None,
+        seed: int = 42,
+    ) -> Path:
         policy = build_policy(policy_name)
-        log.info("rollout policy=%s episodes=%s", policy_name, self.episodes)
+        log.info("rollout policy=%s episodes=%s seed=%s", policy_name, self.episodes, seed)
         return run_rollout(
             policy,
             run_dir=self.run_dir,
             episodes=self.episodes,
+            seed=seed,
             env_kwargs=env_kwargs,
             trace_subdir="eval_traces",
         )
 
-    def run_ppo(self, model, env_kwargs: dict | None = None) -> Path:
-        log.info("rollout PPO episodes=%s", self.episodes)
+    def run_ppo(self, model, env_kwargs: dict | None = None, seed: int = 42) -> Path:
+        log.info("rollout PPO episodes=%s seed=%s", self.episodes, seed)
         return run_rollout(
             PPOPolicyAdapter(model),
             run_dir=self.run_dir,
             episodes=self.episodes,
+            seed=seed,
             env_kwargs=env_kwargs,
             trace_subdir="eval_traces",
         )

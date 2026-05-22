@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from rlcbtc.sim.scheduler import HeadwayScheduler
+from rlcbtc.sim.station_ops import apply_station_ops
 from rlcbtc.sim.world import World, WorldMetrics
 
 
@@ -41,9 +42,6 @@ class SimEngine:
 
     def tick(self, notch_overrides: dict[str, float] | None = None) -> WorldMetrics:
         self.scheduler.maybe_spawn(self.world, self.dt_sec, self.headway_bias_sec)
-        for tr in self.world.trains.values():
-            if tr.dwell_remaining_sec > 0:
-                tr.dwell_remaining_sec = max(0.0, tr.dwell_remaining_sec - self.dt_sec)
-                tr.acceleration_level = -2.0
+        apply_station_ops(self.world, self.dwell_bias_sec)
         self.last_metrics = self.world.step(self.dt_sec, notch_overrides)
         return self.last_metrics

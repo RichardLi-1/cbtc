@@ -29,7 +29,13 @@ class ReplayLogger:
             }
         )
 
-    def flush_summary(self, out_path: Path) -> None:
+    def flush_summary(
+        self,
+        out_path: Path,
+        *,
+        seed: int | None = None,
+        shield_enabled: bool | None = None,
+    ) -> None:
         trace_path = self.trace_dir / "steps.jsonl"
         with trace_path.open("w", encoding="utf-8") as f:
             for row in self._rows:
@@ -39,4 +45,8 @@ class ReplayLogger:
         summary["unsafe_action_rate"] = sum(1 for r in self._rows if r.get("shield_intervened")) / max(
             len(self._rows), 1
         )
-        out_path.write_text(json.dumps(summary, indent=2))
+        if seed is not None:
+            summary["seed"] = seed
+        if shield_enabled is not None:
+            summary["shield_enabled"] = shield_enabled
+        out_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
