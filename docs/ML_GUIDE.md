@@ -50,7 +50,7 @@ Numbers use the same **Urbalis-style sketch** (fixed margin + closing distance o
 2. **ActionShield** may clamp the action if speed or `min_slack_m` violates `Constraints`.
 3. **SimEngine** applies biases, may spawn a train via `HeadwayScheduler`, runs **authority update** then **physics integration** for every train for `dt_seconds`.
 4. **Observation** builder normalizes fleet means (speed, slack, headway std, delays, …).
-5. **Reward** = `-delay - 0.25·headway_variance - 10·violations` (see `envs/reward.py`).
+5. **Reward** = `-delay - 0.25·headway_variance - 10·violations - 1·shield_intervention` when the shield overrides the proposed action (see `envs/reward.py`).
 
 ## Training
 

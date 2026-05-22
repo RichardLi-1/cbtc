@@ -25,6 +25,13 @@ class SimEngine:
         self.dwell_bias_sec = 0.0
         self.last_metrics = WorldMetrics()
 
+    def refresh_authority(self) -> None:
+        """Update ATP slack from current positions (no sim time advance)."""
+        roster = list(self.world.trains.values())
+        self.world.track.update_authority(roster)
+        if roster:
+            self.last_metrics.min_slack_m = min(t.atp_slack_m for t in roster)
+
     def apply_dispatch_action(self, action: list[float]) -> None:
         """Map normalized [-1,1] action vector to headway / dwell biases."""
         if len(action) >= 1:

@@ -1,5 +1,13 @@
+import numpy as np
+
 from rlcbtc.envs.dispatch_env import DispatchEnv
 from rlcbtc.policies.rule_based import RuleBasedDispatchPolicy
+
+
+def test_reset_observation_is_finite():
+    env = DispatchEnv(horizon_steps=5)
+    obs, _ = env.reset()
+    assert np.isfinite(obs).all()
 
 
 def test_env_step_shape():

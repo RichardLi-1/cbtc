@@ -5,7 +5,19 @@
       "Bash(npm run *)",
       "Bash(curl -s http://localhost:5173)",
       "Bash(curl -s http://localhost:5175)",
-      "Bash(xargs rm -f)"
+      "Bash(xargs rm -f)",
+      "Bash(npx vitest *)",
+      "Bash(chmod +x /Users/richardli/dev/cbtc/dev.sh)",
+      "Bash(bash -n /Users/richardli/dev/cbtc/dev.sh)",
+      "Bash(lsof -nP -iTCP:8000 -sTCP:LISTEN)",
+      "Bash(./backend/venv/bin/python -c \"import backend.main\")",
+      "Bash(./venv/bin/python -c \"import main\")",
+      "Bash(timeout 3 ./venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000)",
+      "Bash(python3 -m venv backend/venv)",
+      "Bash(./venv/bin/python -c \"import main; print\\('import ok'\\)\")",
+      "Bash(lsof -nP -iTCP:5173 -sTCP:LISTEN)",
+      "Bash(bash --version)",
+      "Bash(/bin/bash --version)"
     ]
   }
 }
