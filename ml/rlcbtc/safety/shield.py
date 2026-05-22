@@ -30,4 +30,9 @@ class ActionShield:
                 intervened = True
                 reason = reason or "authority_buffer"
 
+        if state.get("yard_occupied") and len(action) >= 1 and action[0] < 0.0:
+            action[0] = 0.0
+            intervened = True
+            reason = reason or "yard_occupied"
+
         return action, {"intervened": intervened, "reason": reason}

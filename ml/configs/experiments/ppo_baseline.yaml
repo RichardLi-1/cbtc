@@ -2,6 +2,10 @@ name: ppo_baseline
 seed: 42
 total_timesteps: 1000000
 eval_every_steps: 50000
+training:
+  persist_checkpoints: true
+  checkpoint_every_steps: 50000
+  resume: false
 env:
   scenario: configs/scenarios/weekday_peak.yaml
   episode_horizon_steps: 3600

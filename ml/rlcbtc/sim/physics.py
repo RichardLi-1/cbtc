@@ -43,6 +43,8 @@ class TrainPhysics:
     authority_eoa_m: float = 0.0
 
     schedule_delay_sec: float = 0.0
+    planned_arrival_sec: float = 0.0
+    next_station_idx: int = 0
     dwell_remaining_sec: float = 0.0
 
     acceleration_curve: list[tuple[float, float]] = field(default_factory=lambda: list(TR_ACCELERATION_CURVE))

@@ -2,6 +2,10 @@ name: ppo_smoke
 seed: 42
 total_timesteps: 2048
 eval_episodes: 3
+training:
+  persist_checkpoints: true
+  checkpoint_every_steps: 1024
+  resume: false
 env:
   episode_horizon_steps: 60
   dt_seconds: 1

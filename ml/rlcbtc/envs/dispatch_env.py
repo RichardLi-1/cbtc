@@ -10,6 +10,7 @@ from rlcbtc.envs.observation import OBS_DIM, build_observation
 from rlcbtc.envs.reward import compute_reward
 from rlcbtc.safety.shield import ActionShield
 from rlcbtc.sim.sim_engine import SimEngine
+from rlcbtc.sim.spawn_guard import is_yard_occupied
 
 
 class DispatchEnv(gym.Env):
@@ -61,6 +62,7 @@ class DispatchEnv(gym.Env):
             state = {
                 "speed_mps": max(t.speed_kph / 3.6 for t in self.engine.world.trains.values()) if self.engine.world.trains else 0.0,
                 "min_slack_m": self.engine.last_metrics.min_slack_m,
+                "yard_occupied": is_yard_occupied(self.engine.world),
             }
             safe, meta = self.shield.apply(raw, state)
         else:
@@ -88,6 +90,8 @@ class DispatchEnv(gym.Env):
                 "mean_delay_sec": metrics.mean_delay_sec,
                 "min_slack_m": metrics.min_slack_m,
                 "violations": metrics.violations,
+                "headway_bias_sec": self.engine.headway_bias_sec,
+                "dwell_bias_sec": self.engine.dwell_bias_sec,
             },
         }
         return obs, float(reward), terminated, truncated, info

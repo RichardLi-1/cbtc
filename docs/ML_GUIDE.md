@@ -49,8 +49,8 @@ Numbers use the same **Urbalis-style sketch** (fixed margin + closing distance o
 1. **Policy** outputs `action ∈ [-1,1]²` (headway correction, dwell correction).
 2. **ActionShield** may clamp the action if speed or `min_slack_m` violates `Constraints`.
 3. **SimEngine** applies biases, may spawn a train via `HeadwayScheduler`, runs **authority update** then **physics integration** for every train for `dt_seconds`.
-4. **Observation** builder normalizes fleet means (speed, slack, headway std, delays, …).
-5. **Reward** = `-delay - 0.25·headway_variance - 10·violations - 1·shield_intervention` when the shield overrides the proposed action (see `envs/reward.py`).
+4. **Observation** builder normalizes fleet means (speed, slack, headway std, delays, …). **Dwell bias** (`action[1]`) extends platform stop time via `sim/station_ops.py` (base 18s + bias, clamped 5–45s).
+5. **Reward** = `-delay/60 - 0.25·headway_variance - 10·violations - 1·shield_intervention` when the shield overrides the proposed action (see `envs/reward.py`). **Delay** is timetable lateness (`sim/timetable.py`).
 
 ## Training
 
@@ -67,6 +67,9 @@ python -m rlcbtc.cli.train --config configs/experiments/ppo_baseline.yaml
 ```
 
 Artifacts land in `ml/runs/<name>/latest/`:
+
+- `training_state.json` — timesteps done, status, last checkpoint path (for resume)
+- `checkpoints/ppo_<step>.zip` — periodic SB3 saves when `training.persist_checkpoints` is true
 
 - `config.json` — frozen experiment config
 - `train.log` — CLI + runner logs (stderr mirrors this with `-v` for debug)

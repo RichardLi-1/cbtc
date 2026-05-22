@@ -17,6 +17,7 @@ export default defineConfig({
       '/state': 'http://localhost:8000',
       '/commands': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
+      '/ml': 'http://localhost:8001',
     },
   },
 })

@@ -6,6 +6,7 @@ import statistics
 from dataclasses import dataclass
 
 from rlcbtc.sim.physics import KPH_TO_MPS, TrainPhysics
+from rlcbtc.sim.timetable import TimetableTracker
 from rlcbtc.sim.track import RingTrack, forward_distance, wrap_chainage
 
 
@@ -31,6 +32,12 @@ class World:
         self.cruise_speed_kph = cruise_speed_kph
         self.sim_time_sec = 0.0
         self.trains: dict[str, TrainPhysics] = {}
+        self.timetable = TimetableTracker(
+            self.track.station_chainages,
+            route_len_m,
+            cruise_speed_kph=cruise_speed_kph,
+            service_headway_sec=target_headway_sec,
+        )
         self._spawn_roster(num_trains)
 
     def _spawn_roster(self, n: int) -> None:
@@ -38,19 +45,23 @@ class World:
         for i in range(max(1, n)):
             s = (self.route_len_m * i / n) % self.route_len_m
             tid = f"T{i:02d}"
-            self.trains[tid] = TrainPhysics(
+            tr = TrainPhysics(
                 train_id=tid,
                 chainage_front_m=s,
                 speed_kph=self.cruise_speed_kph * 0.9,
                 acceleration_level=2.0,
             )
+            self.trains[tid] = tr
+            self.timetable.init_train(tr, i, self.sim_time_sec)
 
     def add_train(self, train_id: str, chainage_front_m: float, speed_kph: float = 0.0) -> None:
-        self.trains[train_id] = TrainPhysics(
+        tr = TrainPhysics(
             train_id=train_id,
             chainage_front_m=wrap_chainage(chainage_front_m, self.route_len_m),
             speed_kph=speed_kph,
         )
+        self.trains[train_id] = tr
+        self.timetable.init_train(tr, len(self.trains) - 1, self.sim_time_sec)
 
     def step(self, dt_sec: float, notch_commands: dict[str, float] | None = None) -> WorldMetrics:
         self.sim_time_sec += dt_sec
@@ -67,6 +78,9 @@ class World:
             if tr.atp_slack_m < 0:
                 violations += 1
             min_slack = min(min_slack, tr.atp_slack_m)
+
+        if self.timetable is not None:
+            self.timetable.update_all(roster, self.sim_time_sec)
 
         headways = self._headways_sec()
         hw_std = float(statistics.pstdev(headways)) if len(headways) > 1 else 0.0

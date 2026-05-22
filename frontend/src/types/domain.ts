@@ -141,3 +141,25 @@ export interface InjectedEvent {
   duration_s: number
   active: boolean
 }
+
+// ── RL training (ML API on :8001, proxied as /ml) ─────────────────────────
+
+export type TrainingStatusKind = 'idle' | 'running' | 'completed' | 'stopped' | 'failed'
+
+export interface TrainingStatus {
+  status?: TrainingStatusKind
+  running?: boolean
+  run_dir?: string
+  experiment?: string
+  total_timesteps?: number
+  completed_timesteps?: number
+  last_checkpoint?: string
+  persist_checkpoints?: boolean
+  error?: string | null
+}
+
+export interface TrainingSettings {
+  persist_checkpoints: boolean
+  resume: boolean
+  config: string
+}

@@ -15,3 +15,12 @@ def test_metrics_delay_stats():
     m = compute_metrics(rows)
     assert m['delay_mean_sec'] == 20.0
     assert m['delay_p95_sec'] == 30.0
+
+
+def test_metrics_headway_stats():
+    rows = [
+        {'headway_std_sec': 4.0},
+        {'headway_std_sec': 8.0},
+    ]
+    m = compute_metrics(rows)
+    assert m['headway_std_mean_sec'] == 6.0

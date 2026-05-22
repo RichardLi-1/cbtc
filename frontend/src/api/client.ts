@@ -1,4 +1,4 @@
-import type { Topology, RuntimeState, SwitchState, SignalAspect } from '../types/domain'
+import type { Topology, RuntimeState, SwitchState, SignalAspect, TrainingStatus, TrainingSettings } from '../types/domain'
 import { MOCK_TOPOLOGY, tickMockRuntime } from '../mock/mockData'
 import { useConnectionStore } from '../store/connectionStore'
 
@@ -110,4 +110,27 @@ export async function commandSignal(signalId: string, aspect: SignalAspect): Pro
     useConnectionStore.getState().report('commands', 'error', String(err))
     throw err
   }
+}
+
+// ── ML training API (requires: python -m rlcbtc.cli.serve_training) ────────
+
+export async function fetchTrainingStatus(): Promise<TrainingStatus> {
+  if (MOCK_MODE) return { status: 'idle', running: false }
+  return withRetry(() => apiFetch<TrainingStatus>('/ml/training/status'))
+}
+
+export async function startTraining(settings: TrainingSettings): Promise<TrainingStatus> {
+  if (MOCK_MODE) {
+    return { status: 'running', running: true, completed_timesteps: 0, total_timesteps: 2048 }
+  }
+  return apiFetch<TrainingStatus>('/ml/training/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  })
+}
+
+export async function stopTraining(): Promise<TrainingStatus> {
+  if (MOCK_MODE) return { status: 'stopped', running: false }
+  return apiFetch<TrainingStatus>('/ml/training/stop', { method: 'POST' })
 }

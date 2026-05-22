@@ -2,8 +2,9 @@
  * Hidden config panel — toggle with Ctrl+Shift+C.
  * Manages rolling stock profiles, headway targets, and event injection.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRuntimeStore } from '../store/runtimeStore'
+import { useTrainingStore } from '../store/trainingStore'
 import { COLORS } from '../constants/colors'
 import type { EventKind, RollingStockProfile } from '../types/domain'
 
@@ -41,13 +42,45 @@ function NumInput({ value, min, max, step, onChange }: { value: number; min: num
   )
 }
 
+const TRAINING_CONFIGS = ['ppo_smoke.yaml', 'ppo_baseline.yaml', 'rule_based_smoke.yaml']
+
 export function ConfigPanel({ open }: { open: boolean }) {
   const { config, runtime, updateConfig } = useRuntimeStore()
+  const {
+    persistCheckpoints,
+    resumeTraining,
+    configName,
+    status: trainingStatus,
+    error: trainingError,
+    setPersistCheckpoints,
+    setResumeTraining,
+    setConfigName,
+    start: startTraining,
+    stop: stopTraining,
+    startPolling: startTrainingPoll,
+    stopPolling: stopTrainingPoll,
+    refreshStatus,
+  } = useTrainingStore()
   const [newEventKind, setNewEventKind] = useState<EventKind>('emergency_brake')
   const [newEventTrain, setNewEventTrain] = useState('T01')
   const [newEventDur, setNewEventDur] = useState(30)
 
+  useEffect(() => {
+    if (!open) {
+      stopTrainingPoll()
+      return
+    }
+    void refreshStatus()
+    startTrainingPoll()
+    return () => stopTrainingPoll()
+  }, [open, refreshStatus, startTrainingPoll, stopTrainingPoll])
+
   if (!open) return null
+
+  const trainingRunning = Boolean(trainingStatus?.running)
+  const done = trainingStatus?.completed_timesteps ?? 0
+  const total = trainingStatus?.total_timesteps ?? 0
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0
 
   const activeProfile: RollingStockProfile | undefined =
     config.profiles.find(p => p.id === config.active_profile)
@@ -100,6 +133,100 @@ export function ConfigPanel({ open }: { open: boolean }) {
     <div style={panelStyle}>
       <div style={{ color: COLORS.PANEL_TEXT, fontFamily: 'monospace', fontSize: 13, marginBottom: 12 }}>
         ⚙ SIM CONFIG <span style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }}>(Ctrl+Shift+C)</span>
+      </div>
+
+      {section('RL TRAINING')}
+      <Row label="Experiment">
+        <select
+          value={configName}
+          onChange={e => setConfigName(e.target.value)}
+          disabled={trainingRunning}
+          style={{
+            flex: 1,
+            background: COLORS.BUTTON_BG,
+            color: COLORS.PANEL_TEXT,
+            border: `1px solid ${COLORS.PANEL_BORDER}`,
+            borderRadius: 3,
+            fontSize: 11,
+            fontFamily: 'monospace',
+            padding: '2px 4px',
+          }}
+        >
+          {TRAINING_CONFIGS.map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </Row>
+      <Row label="Save checkpoints">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: COLORS.PANEL_TEXT, fontSize: 11, fontFamily: 'monospace' }}>
+          <input
+            type="checkbox"
+            checked={persistCheckpoints}
+            onChange={e => setPersistCheckpoints(e.target.checked)}
+            disabled={trainingRunning}
+          />
+          persist across runs
+        </label>
+      </Row>
+      <Row label="Resume">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: COLORS.PANEL_TEXT, fontSize: 11, fontFamily: 'monospace' }}>
+          <input
+            type="checkbox"
+            checked={resumeTraining}
+            onChange={e => setResumeTraining(e.target.checked)}
+            disabled={trainingRunning}
+          />
+          continue from last checkpoint
+        </label>
+      </Row>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <button
+          onClick={() => void startTraining()}
+          disabled={trainingRunning}
+          style={{
+            background: COLORS.BUTTON_ACTIVE,
+            color: '#fff',
+            border: 'none',
+            borderRadius: 3,
+            padding: '4px 12px',
+            fontSize: 11,
+            fontFamily: 'monospace',
+            cursor: trainingRunning ? 'default' : 'pointer',
+            opacity: trainingRunning ? 0.5 : 1,
+          }}
+        >
+          Start
+        </button>
+        <button
+          onClick={() => void stopTraining()}
+          disabled={!trainingRunning}
+          style={{
+            background: COLORS.BUTTON_BG,
+            color: COLORS.PANEL_TEXT,
+            border: `1px solid ${COLORS.PANEL_BORDER}`,
+            borderRadius: 3,
+            padding: '4px 12px',
+            fontSize: 11,
+            fontFamily: 'monospace',
+            cursor: !trainingRunning ? 'default' : 'pointer',
+            opacity: !trainingRunning ? 0.5 : 1,
+          }}
+        >
+          Stop
+        </button>
+      </div>
+      <div style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10, fontFamily: 'monospace', marginBottom: 8 }}>
+        {trainingRunning ? 'running' : (trainingStatus?.status ?? 'idle')}
+        {total > 0 ? ` — ${done.toLocaleString()} / ${total.toLocaleString()} (${pct}%)` : ''}
+        {trainingStatus?.last_checkpoint ? ` — ${trainingStatus.last_checkpoint}` : ''}
+      </div>
+      {trainingError && (
+        <div style={{ color: COLORS.ERROR_BANNER, fontSize: 10, fontFamily: 'monospace', marginBottom: 8 }}>
+          {trainingError}
+        </div>
+      )}
+      <div style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 9, fontFamily: 'monospace', marginBottom: 4 }}>
+        Requires ML API: python -m rlcbtc.cli.serve_training (port 8001)
       </div>
 
       {section('OPERATIONS')}
