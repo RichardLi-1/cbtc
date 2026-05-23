@@ -38,7 +38,20 @@ pip install -r requirements.txt
 ```bash
 cd ml
 python -m rlcbtc.cli.train --config configs/experiments/ppo_baseline.yaml
+# resume after interrupt (uses runs/<name>/latest/checkpoints/)
+python -m rlcbtc.cli.train --config configs/experiments/ppo_baseline.yaml --resume
 ```
+
+Checkpoints land in `runs/<name>/latest/checkpoints/ppo_<timestep>.zip` plus `training_state.json` for progress.
+
+### Training API (frontend)
+
+```bash
+cd ml
+python -m rlcbtc.cli.serve_training   # http://127.0.0.1:8001
+```
+
+The UI config panel (Ctrl+Shift+C) can start/stop training when this service is running.
 
 ### Evaluate a run
 
@@ -49,9 +62,14 @@ python -m rlcbtc.cli.evaluate --run-dir runs/ppo_baseline/latest
 
 ### Compare RL vs baseline
 
+Both runs should share the same `seed`, env horizon, `dt_seconds`, and `shield_enabled` in `config.json`. Metrics come from each run’s `evaluation.json` (mean delay, headway std, unsafe-action rate). Percentages are computed from those summaries, not hardcoded.
+
 ```bash
 cd ml
 python -m rlcbtc.cli.compare --rl-run runs/ppo_baseline/latest --baseline-run runs/rule_based/latest
+# optional: re-run batch eval on both dirs first, then compare
+python -m rlcbtc.cli.compare --rl-run runs/ppo_baseline/latest --baseline-run runs/rule_based/latest --re-eval
+python -m rlcbtc.cli.report --run-dir runs/ppo_baseline/latest --baseline-run runs/rule_based/latest
 ```
 
 ## Repository Layout
@@ -87,5 +105,5 @@ make report
 
 - Expand dispatch environment state/action realism
 - Integrate stronger safety-constraint enforcement
-- Add richer metrics and significance analysis (delay p95 in progress)
+- Wire scenario sweeps into experiment configs
 - Improve reproducibility and experiment tracking
