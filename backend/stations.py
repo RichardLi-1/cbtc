@@ -48,3 +48,16 @@ def build_yus_berths() -> list[StationBerth]:
 
 
 YUS_BERTHS: list[StationBerth] = build_yus_berths()
+
+
+def outbound_passenger_berths(berths: list[StationBerth] | None = None) -> list[StationBerth]:
+    """One stop per station on the outbound leg (ATO targets — not every ib/ob micro-edge)."""
+    src = berths if berths is not None else YUS_BERTHS
+    seen: set[int] = set()
+    out: list[StationBerth] = []
+    for b in src:
+        if b.leg != "ob" or b.stop_index in seen:
+            continue
+        seen.add(b.stop_index)
+        out.append(b)
+    return out

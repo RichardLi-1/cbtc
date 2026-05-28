@@ -21,7 +21,13 @@ export const COLORS = {
   SIGNAL_FLASHING_YELLOW: '#ff9800',
   SIGNAL_DARK: '#1c2a30',
   SIGNAL_BORDER: '#334455',
-  SIGNAL_RADIUS: 6,
+  SIGNAL_RADIUS: 4,
+
+  // Station markers
+  STATION_MARKER_FILL: '#8bc34a',
+  STATION_MARKER_BORDER: '#263238',
+  STATION_MARKER_HALO: 'rgba(139, 195, 74, 0.35)',
+  STATION_LABEL_BG: 'rgba(8, 18, 26, 0.85)',
 
   // Switches
   SWITCH_NORMAL: '#00e5ff',

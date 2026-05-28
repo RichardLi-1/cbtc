@@ -7,6 +7,9 @@ from pathlib import Path
 _DATA_DIR = Path(__file__).resolve().parent / "data"
 _TRACK_SEP = 22   # pixels between outbound and inbound tracks
 _PAD       = 200  # canvas padding
+_SIGNAL_SPACING_M = 180.0
+_SIGNAL_MIN_T = 0.08
+_SIGNAL_MAX_T = 0.92
 
 
 def _build_yus() -> tuple[dict, list[str]]:
@@ -101,15 +104,20 @@ def _build_yus() -> tuple[dict, list[str]]:
     all_xovers = xovers + mid_xovers
     all_edges  = ob_edges + ib_edges + all_xovers
 
-    # ── signals (one per revenue edge, 8 % from start) ──
+    # ── signals (multiple per revenue edge; denser than station spacing) ──
     signals = []
     for e in ob_edges + ib_edges:
-        p0, p1, t = e['points'][0], e['points'][-1], 0.08
-        signals.append({
-            'id': f"sig_{e['id']}", 'edge_id': e['id'], 'offset': t,
-            'position': {'x': p0['x'] + t*(p1['x']-p0['x']), 'y': p0['y'] + t*(p1['y']-p0['y'])},
-            'aspect': 'green', 'block_id': e['block_id'],
-        })
+        p0, p1 = e['points'][0], e['points'][-1]
+        edge_len = float(e.get('length', 0.0))
+        count = max(1, int(round(edge_len / _SIGNAL_SPACING_M)))
+        for i in range(count):
+            t_raw = (i + 1) / (count + 1)
+            t = min(_SIGNAL_MAX_T, max(_SIGNAL_MIN_T, t_raw))
+            signals.append({
+                'id': f"sig_{e['id']}_{i+1}", 'edge_id': e['id'], 'offset': t,
+                'position': {'x': p0['x'] + t*(p1['x']-p0['x']), 'y': p0['y'] + t*(p1['y']-p0['y'])},
+                'aspect': 'green', 'block_id': e['block_id'],
+            })
 
     # ── bounds ──
     xs = [v['x'] for v in nodes.values()]

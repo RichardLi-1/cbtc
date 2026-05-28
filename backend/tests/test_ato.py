@@ -17,20 +17,32 @@ def test_train_enters_dwell_near_berth():
     assert t.at_station_name
 
 
-def test_flyby_snaps_to_berth():
+def test_passed_berth_at_speed_skips_to_next_stop():
     t = train.lines[0].trains[0]
     ato = AtoController(cfg=AtoConfig(dwell_sec=5.0))
-    berth = ato.target_berth(t)
-    # 50 m past platform — forward_distance to berth is ~route_len - 50
-    t.chainage_front_m = (berth.chainage_m + 50.0) % ROUTE_LEN_M
+    first = ato.target_berth(t)
+    t.chainage_front_m = (first.chainage_m + 50.0) % ROUTE_LEN_M
     t.speed = 45.0
     t.dwell_remaining_sec = 0.0
-    dist = forward_distance(t.chainage_front_m, berth.chainage_m, ROUTE_LEN_M)
-    assert dist > 1000.0
-    assert ahead_of_berth_m(t.chainage_front_m, berth.chainage_m, ROUTE_LEN_M) > 40.0
+    t.stop_index = 0
     ato.apply_commands([t])
-    assert t.dwell_remaining_sec > 0
-    assert abs(t.chainage_front_m - berth.chainage_m) < 1.0
+    assert t.dwell_remaining_sec == 0.0
+    assert t.stop_index == 1
+
+
+def test_leaving_first_station_does_not_immediate_dwell():
+    t = train.lines[0].trains[0]
+    ato = AtoController()
+    t.chainage_front_m = 50.0
+    t.speed = 0.0
+    t.dwell_remaining_sec = 0.0
+    t.stop_index = 0
+    for _ in range(12):
+        ato.apply_commands([t])
+        t.step(0.5, ROUTE_LEN_M)
+        ato.tick_dwell(t, 0.5)
+        assert t.dwell_remaining_sec == 0.0
+    assert t.speed > 5.0
 
 
 def test_simulation_visits_many_stations():

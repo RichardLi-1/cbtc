@@ -22,7 +22,7 @@ interface EventsStore {
   paused: boolean
   panelOpen: boolean
   injectOpen: boolean
-  append: (e: Omit<SimEvent, 'id' | 't' | 'simT'>) => void
+  append: (e: Omit<SimEvent, 'id' | 't' | 'simT'> & { simT?: number | null }) => void
   clear: () => void
   togglePaused: () => void
   setPanelOpen: (v: boolean) => void
@@ -38,12 +38,14 @@ export const useEventsStore = create<EventsStore>((set, get) => ({
   injectOpen: false,
   append: (e) => {
     if (get().paused) return
-    const simT = useRuntimeStore.getState().runtime?.timestamp ?? null
+    const rt = useRuntimeStore.getState().runtime
+    const { simT: simTOverride, ...rest } = e
+    const simT = simTOverride ?? rt?.sim_time_s ?? rt?.timestamp ?? null
     const ev: SimEvent = {
       id: _nextId++,
       t: Date.now(),
       simT,
-      ...e,
+      ...rest,
     }
     set((s) => ({ events: [ev, ...s.events].slice(0, MAX_EVENTS) }))
   },
@@ -58,6 +60,10 @@ export const useEventsStore = create<EventsStore>((set, get) => ({
 let _prev: RuntimeState | null = null
 let _prevStale = false
 let _prevCommandError: string | null = null
+let _prevDispatchCount = 0
+let _prevDispatchPlan = ''
+const _seenLogKeys = new Set<string>()
+const _seenPlannedIds = new Set<string>()
 
 useRuntimeStore.subscribe((state) => {
   const append = useEventsStore.getState().append
@@ -88,7 +94,74 @@ useRuntimeStore.subscribe((state) => {
       message: `runtime online — ${cur.trains.length} trains, ${cur.switches.length} switches, ${cur.signals.length} signals`,
     })
     _prev = cur
+    _prevDispatchCount = cur.ops?.dispatch?.count ?? 0
     return
+  }
+
+  for (const row of cur.ops?.event_log ?? []) {
+    const key = `${row.sim_t}:${row.kind}:${row.message}`
+    if (_seenLogKeys.has(key)) continue
+    _seenLogKeys.add(key)
+    const src = (row.source === 'manual' || row.source === 'driver' || row.source === 'wayside'
+      ? row.source
+      : 'system') as EventSource
+    append({
+      source: src,
+      severity: row.severity,
+      kind: row.kind,
+      message: row.message,
+      simT: row.sim_t,
+    })
+  }
+
+  for (const inc of cur.ops?.injected_events ?? []) {
+    if (inc.active || inc.starts_in_s <= 0) continue
+    if (_seenPlannedIds.has(inc.id)) continue
+    _seenPlannedIds.add(inc.id)
+    const target = inc.target_train_id ?? inc.target_signal_id ?? ''
+    append({
+      source: 'manual',
+      severity: 'info',
+      kind: 'PLAN',
+      message: `${inc.kind}${target ? ` → ${target}` : ''} in ~${Math.ceil(inc.starts_in_s)}s`,
+    })
+  }
+
+  // Dispatch telemetry (actual + future/next)
+  const dispatch = cur.ops?.dispatch
+  if (dispatch) {
+    const count = dispatch.count ?? 0
+    if (count > _prevDispatchCount) {
+      append({
+        source: 'wayside',
+        severity: 'info',
+        kind: 'DISP',
+        message: `train dispatched (count=${count})`,
+      })
+      _prevDispatchCount = count
+    }
+
+    const eta = dispatch.next_due_in_s
+    if (eta != null) {
+      let bucket = ''
+      if (dispatch.blocked) bucket = 'blocked'
+      else if (eta <= 5) bucket = 'eta<=5'
+      else if (eta <= 15) bucket = 'eta<=15'
+      else if (eta <= 30) bucket = 'eta<=30'
+      else if (eta <= 60) bucket = 'eta<=60'
+      const planKey = `${bucket}:${dispatch.blocked ? 1 : 0}`
+      if (bucket && planKey !== _prevDispatchPlan) {
+        append({
+          source: 'system',
+          severity: dispatch.blocked ? 'warn' : 'info',
+          kind: 'PLAN',
+          message: dispatch.blocked
+            ? 'next dispatch blocked (yard occupied or max trains)'
+            : `next dispatch due in ~${Math.ceil(eta)}s`,
+        })
+        _prevDispatchPlan = planKey
+      }
+    }
   }
 
   // Train roster diff
@@ -106,9 +179,18 @@ useRuntimeStore.subscribe((state) => {
   for (const t of cur.trains) {
     const p = prevTrains.get(t.train_id)
     if (p && p.state !== t.state) {
+      const at = t.station_name ? ` @ ${t.station_name}` : ''
       append({
         source: 'wayside', severity: 'info', kind: 'TRAIN',
-        message: `${t.train_id} ${p.state} → ${t.state}`,
+        message: `${t.train_id} ${p.state} → ${t.state}${at}`,
+      })
+    }
+    if (p && !p.station_name && t.station_name && t.state === 'dwelling') {
+      append({
+        source: 'wayside',
+        severity: 'info',
+        kind: 'DWELL',
+        message: `${t.train_id} dwelling at ${t.station_name}`,
       })
     }
     // ATP slack edge-triggers: only fire on the crossing, not every tick.

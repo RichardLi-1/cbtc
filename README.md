@@ -35,15 +35,24 @@ Simplified CBTC-style simulation and control-room frontend inspired by TTC opera
   - stale-data indicator and API error banner
   - mock fallback mode when backend is unreachable
 
-## Frontend run
+## Quick start (sim + ML + UI)
 
 ```bash
-cd frontend
-npm install
-npm run dev
+npm run setup    # backend venv, frontend deps, ml venv
+npm run dev      # backend :8000, ML API :8001, Vite :5173
 ```
 
-Default dev URL is `http://localhost:5175` (or next free port).
+Open `http://localhost:5173`. Use **DISPATCH — RULE vs ML** (bottom-left) to compare classical vs bundled PPO policy. Ctrl+Shift+C opens training config.
+
+Bundled model: `ml/models/deployed/ppo_baseline/policy.zip` (refresh after training — see `ml/models/deployed/README.md`).
+
+## Frontend only
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+Falls back to mock mode if backend is down. Default dev URL is `http://localhost:5173` (or next free port).
 
 ## Backend integration contract (frontend-facing)
 
@@ -52,7 +61,16 @@ Default dev URL is `http://localhost:5175` (or next free port).
 - `POST /commands/switch/...`
 - `POST /commands/signal/...`
 
-`vite.config.ts` proxies these paths to `localhost:8000` in development.
+`vite.config.ts` proxies sim paths to `localhost:8000` and `/ml` to `localhost:8001` in development.
+
+## Production (Docker)
+
+```bash
+npm run build:frontend
+docker compose up --build
+```
+
+UI at `http://localhost:8080` (nginx → backend + ML API).
 
 ## Next recommended steps
 
