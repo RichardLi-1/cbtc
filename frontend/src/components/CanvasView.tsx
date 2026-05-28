@@ -3,7 +3,6 @@ import { useTopologyStore } from '../store/topologyStore'
 import { useRuntimeStore } from '../store/runtimeStore'
 import { Viewport } from '../render/Viewport'
 import { renderTrackLayer } from '../render/layers/TrackLayer'
-import { renderBlockLayer } from '../render/layers/BlockLayer'
 import { renderSwitchLayer } from '../render/layers/SwitchLayer'
 import { renderSignalLayer } from '../render/layers/SignalLayer'
 import { renderTrainLayer } from '../render/layers/TrainLayer'
@@ -132,13 +131,13 @@ export function CanvasView() {
       }
 
       renderTrackLayer(ctx, vp, topology)
+      // Station platforms render under signals/switches/trains so the icons sit on top.
+      renderLabelLayer(ctx, vp, topology, showLabels)
       if (runtime) {
-        renderBlockLayer(ctx, vp, topology, runtime)
         renderSwitchLayer(ctx, vp, topology, runtime)
         renderSignalLayer(ctx, vp, topology, runtime, flashRef.current)
         renderTrainLayer(ctx, vp, topology, runtime, showSafeZones, showLabels)
       }
-      if (showLabels) renderLabelLayer(ctx, vp, topology)
 
       animRef.current = requestAnimationFrame(render)
     }

@@ -78,6 +78,10 @@ export interface TrainPosition {
   safe_zone_rear: number
   atp_slack_m?: number
   authority_eoa_m?: number | null
+  fleet?: string
+  passengers?: number
+  passenger_capacity?: number
+  load_pct?: number
 }
 
 export interface BlockRuntime {

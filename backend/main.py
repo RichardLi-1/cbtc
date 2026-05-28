@@ -76,8 +76,10 @@ if train.lines and train.lines[0].trains:
             ),
         )
 
+    # Offset initial roster by half a slot so train 0 isn't sitting on chainage 0
+    # (which would permanently block the yard-clearance spawn check).
     for i, t in enumerate(roster):
-        t.chainage_front_m = ROUTE_LEN_M * i / max(len(roster), 1)
+        t.chainage_front_m = ROUTE_LEN_M * (i + 0.5) / max(len(roster), 1)
         t.speed = 25.0
         t.stop_index = _nearest_stop_index(t.chainage_front_m)
         t.dwell_remaining_sec = 0.0
@@ -185,10 +187,22 @@ def get_state():
                 run_state = "arriving"
             else:
                 run_state = "running"
+            # Synthetic passenger load: morning peak rises, mid-day plateau, evening peak.
+            # Deterministic per-train so the tooltip doesn't strobe between polls.
+            run_num = int(t.get("run_number") or 0)
+            tod = (simulation._sim_time_s % (12 * 3600)) / 3600.0  # 0..12h cycle
+            peak = math.exp(-((tod - 2.0) ** 2) / 1.5) + 0.8 * math.exp(-((tod - 9.0) ** 2) / 2.0)
+            base_load = 0.18 + 0.65 * min(1.0, peak)
+            jitter = (math.sin(run_num * 1.7) + 1.0) * 0.06
+            load_pct = max(0.0, min(1.0, base_load + jitter - 0.08))
+            # Toronto Rocket capacity: ~1100 (seated + standees / 6-car consist).
+            tr_capacity = 1100
+            passengers = int(round(tr_capacity * load_pct))
+
             trains_out.append(
                 {
                     "train_id": f"T{t['run_number']:02d}",
-                    "label": f"T{t['run_number']:02d}",
+                    "label": f"Run {t['run_number']:02d}",
                     "edge_id": eid,
                     "offset": offset,
                     "speed": speed_mps,
@@ -199,6 +213,10 @@ def get_state():
                     "safe_zone_rear": float(t.get("length_m", 138.0)),
                     "atp_slack_m": slack,
                     "authority_eoa_m": _json_float(float(t["authority_eoa_m"])) if t.get("authority_eoa_m") is not None else None,
+                    "fleet": "Bombardier TR",
+                    "passengers": passengers,
+                    "passenger_capacity": tr_capacity,
+                    "load_pct": round(load_pct, 3),
                 }
             )
 

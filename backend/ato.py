@@ -82,9 +82,10 @@ class AtoController:
         dist, ahead = berth_approach(train.chainage_front_m, berth.chainage_m, self.route_len_m)
         v = train.speed
 
-        # Already passed this berth — don't dwell 50 m down the track; target the next stop.
+        # Already passed this berth — dwell if we're still close (incl. v=0 case
+        # where ATP stopped us just past the platform); else target the next stop.
         if ahead > self.cfg.stop_tolerance_m:
-            if 0.0 < v <= CREEP_SPEED_KPH and ahead <= PLATFORM_CREEP_PAST_M:
+            if v <= CREEP_SPEED_KPH and ahead <= PLATFORM_CREEP_PAST_M:
                 return self._latch_dwell(train, berth)
             train.stop_index = (train.stop_index + 1) % len(self.berths)
             berth = self.target_berth(train)
@@ -92,7 +93,8 @@ class AtoController:
 
         train._ato_dist_to_berth_m = dist
 
-        capture = self.cfg.stop_tolerance_m + max(v * KPH_TO_MPS * 0.4, 5.0)
+        # Capture window — bigger floor so a train that braked early still latches.
+        capture = self.cfg.stop_tolerance_m + max(v * KPH_TO_MPS * 0.4, 12.0)
 
         if ahead == 0.0 and dist <= capture and v <= CREEP_SPEED_KPH:
             return self._latch_dwell(train, berth)

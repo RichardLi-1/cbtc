@@ -57,12 +57,19 @@ function entityDetail(hovered: HoveredEntity, topology: Topology, runtime: Runti
     const t = runtime.trains.find(t => t.train_id === id)
     if (!t) return [id]
     const lines = [
-      `Train  ${t.label}`,
-      `Edge   ${t.edge_id}  @${(t.offset * 100).toFixed(1)}%`,
+      `${t.label}`,
+      `Fleet  ${t.fleet ?? 'Bombardier TR'}`,
       `Speed  ${(t.speed * 3.6).toFixed(1)} km/h`,
       `State  ${t.state}`,
-      `Fwd    ${t.safe_zone_front.toFixed(0)} m`,
     ]
+    if (t.passengers != null && t.passenger_capacity != null) {
+      const pct = Math.round((t.load_pct ?? (t.passengers / t.passenger_capacity)) * 100)
+      lines.push(`Load   ${t.passengers}/${t.passenger_capacity} pax (${pct}%)`)
+    }
+    if (t.station_name) {
+      lines.push(`At     ${t.station_name}`)
+    }
+    lines.push(`Fwd    ${t.safe_zone_front.toFixed(0)} m`)
     if (t.atp_slack_m != null) {
       const sign = t.atp_slack_m < 0 ? '' : '+'
       lines.push(`Slack  ${sign}${t.atp_slack_m.toFixed(1)} m`)
