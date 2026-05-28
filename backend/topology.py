@@ -5,7 +5,7 @@ import json, math
 from pathlib import Path
 
 _DATA_DIR = Path(__file__).resolve().parent / "data"
-_TRACK_SEP = 22   # pixels between outbound and inbound tracks
+_TRACK_SEP = 56   # pixels between outbound and inbound tracks
 _PAD       = 200  # canvas padding
 _SIGNAL_SPACING_M = 180.0
 _SIGNAL_MIN_T = 0.08
@@ -87,7 +87,29 @@ def _build_yus() -> tuple[dict, list[str]]:
             'length': max(_edge_len(a['x'], a['y'], b['x'], b['y']), 10.0),
         }
 
-    # Terminus loops
+    # Mid-line crossover: shift the diagonal off the platform so the X glyph
+    # sits between two stations rather than on top of one. The from_node/to_node
+    # still reference the station nodes (the switch logic doesn't care about
+    # the visual offset).
+    def _xover_offset(eid, fn, tn, t: float = 0.30) -> dict:
+        a, b = nd(fn), nd(tn)
+        # Pull each end `t` of the way toward the NEXT station along its own track.
+        # fn is ob_idx → walk toward ob_{idx+1}; tn is ib_idx → walk toward ib_{idx+1}.
+        fn_idx = int(fn.split('_')[1])
+        tn_idx = int(tn.split('_')[1])
+        ob_next = nodes.get(f'ob_{fn_idx + 1}', a)
+        ib_next = nodes.get(f'ib_{tn_idx + 1}', b)
+        ax = a['x'] + (ob_next['x'] - a['x']) * t
+        ay = a['y'] + (ob_next['y'] - a['y']) * t
+        bx = b['x'] + (ib_next['x'] - b['x']) * t
+        by = b['y'] + (ib_next['y'] - b['y']) * t
+        return {
+            'id': eid, 'from_node': fn, 'to_node': tn, 'block_id': f'XOVER_{eid.upper()}',
+            'points': [{'x': ax, 'y': ay}, {'x': bx, 'y': by}],
+            'length': max(_edge_len(ax, ay, bx, by), 10.0),
+        }
+
+    # Terminus loops — keep these AT the terminus (real turn-back lives at the platform).
     xovers = [
         _xover('xover_start', f'ib_0',     f'ob_0'),
         _xover('xover_end',   f'ob_{n-1}', f'ib_{n-1}'),
@@ -99,7 +121,7 @@ def _build_yus() -> tuple[dict, list[str]]:
     mid_xovers = []
     for idx in MID_XOVER_STOPS:
         if 0 < idx < n - 1:
-            mid_xovers.append(_xover(f'xover_mid_{idx}', f'ob_{idx}', f'ib_{idx}'))
+            mid_xovers.append(_xover_offset(f'xover_mid_{idx}', f'ob_{idx}', f'ib_{idx}'))
 
     all_xovers = xovers + mid_xovers
     all_edges  = ob_edges + ib_edges + all_xovers

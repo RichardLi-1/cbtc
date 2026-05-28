@@ -4,7 +4,7 @@ import { COLORS } from '../../constants/colors'
 import { interpolatePolyline, tangentAtT } from '../../utils/geometry'
 import { safeZonePalette, slackTier } from '../../utils/safeZone'
 
-const TRAIN_W = 18   // screen px (half-width)
+const TRAIN_W = 24   // screen px (half-width) — needs room for "Run NN" label
 const TRAIN_H = 5    // screen px (half-height)
 
 function trainColor(train: TrainPosition): string {

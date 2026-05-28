@@ -11,7 +11,7 @@ import type {
 import { MOCK_TOPOLOGY, tickMockRuntime } from '../mock/mockData'
 import { useConnectionStore } from '../store/connectionStore'
 
-const BASE = ''   // proxied by Vite dev server
+const BASE = import.meta.env.VITE_API_BASE || ''   // proxied by Vite dev server
 const TIMEOUT_MS = 4000
 const RETRY_DELAYS = [500, 1000, 2000]   // ms between retries
 

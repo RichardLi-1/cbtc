@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchDispatchComparison, fetchDispatchPolicy, runDispatchCompare } from '../api/client'
+import { useRuntimeStore } from '../store/runtimeStore'
 import type { DispatchComparison } from '../types/domain'
 import { COLORS } from '../constants/colors'
 
@@ -13,12 +14,16 @@ function pct(n: number | null | undefined) {
   return `${sign}${n.toFixed(1)}%`
 }
 
+type LivePolicy = 'rule' | 'ppo'
+
 export function DispatchPanel() {
   const [open, setOpen] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [policyReady, setPolicyReady] = useState<boolean | null>(null)
   const [data, setData] = useState<DispatchComparison | null>(null)
+  const [livePolicy, setLivePolicy] = useState<LivePolicy>('rule')
+  const dispatchStatus = useRuntimeStore((s) => s.runtime?.ops?.dispatch)
 
   const refreshPolicy = useCallback(async () => {
     try {
@@ -99,7 +104,7 @@ export function DispatchPanel() {
     >
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
         <span style={{ color: COLORS.PANEL_TEXT, letterSpacing: '0.06em', flex: 1 }}>
-          DISPATCH — RULE vs ML (PPO)
+          DISPATCH CONTROL
         </span>
         <button
           type="button"
@@ -110,8 +115,47 @@ export function DispatchPanel() {
         </button>
       </div>
 
-      <div style={{ color: COLORS.PANEL_TEXT_DIM, marginBottom: 8, lineHeight: 1.4 }}>
-        Same sim, same seed: classical headway regulator vs bundled neural policy (service headway / dwell knobs).
+      {/* Live dispatch status — from /state ops.dispatch */}
+      <div style={{
+        marginBottom: 10, padding: '6px 8px',
+        background: '#08121a', border: `1px solid ${COLORS.PANEL_BORDER}`, borderRadius: 3,
+      }}>
+        <div style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 9, letterSpacing: '0.12em', marginBottom: 4 }}>
+          LIVE
+        </div>
+        <div style={{ display: 'flex', gap: 14, color: COLORS.PANEL_TEXT, fontSize: 11 }}>
+          <span>Dispatched: <b>{dispatchStatus?.count ?? 0}</b></span>
+          <span>
+            Next:{' '}
+            {dispatchStatus?.blocked
+              ? <span style={{ color: COLORS.SIGNAL_YELLOW }}>blocked</span>
+              : <span>~{Math.max(0, Math.ceil(dispatchStatus?.next_due_in_s ?? 0))}s</span>}
+          </span>
+          <span>Max: <b>{dispatchStatus?.max_trains ?? '—'}</b></span>
+        </div>
+
+        {/* Live policy selector — only 'rule' is wired in the live loop today. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }}>
+          <span style={{ letterSpacing: '0.1em' }}>POLICY</span>
+          <PolicyChip
+            label="Rule-based"
+            active={livePolicy === 'rule'}
+            onClick={() => setLivePolicy('rule')}
+          />
+          <PolicyChip
+            label={`PPO ${policyReady === false ? '(offline)' : '(beta)'}`}
+            active={livePolicy === 'ppo'}
+            disabled={policyReady === false}
+            onClick={() => setLivePolicy('ppo')}
+          />
+          <span style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 9 }}>
+            {livePolicy === 'ppo' ? 'switch is UI-only — live loop runs the rule policy' : ''}
+          </span>
+        </div>
+      </div>
+
+      <div style={{ color: COLORS.PANEL_TEXT_DIM, marginBottom: 8, lineHeight: 1.4, fontSize: 10 }}>
+        <b>A/B compare</b> runs both policies offline on the same seed and reports the deltas below.
         {policyReady === false && (
           <span style={{ color: COLORS.ERROR_BANNER, display: 'block', marginTop: 4 }}>
             ML API or policy missing — run npm run setup && npm run dev
@@ -145,7 +189,7 @@ export function DispatchPanel() {
 
       {error && <div style={{ color: COLORS.ERROR_BANNER, marginBottom: 8 }}>{error}</div>}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', color: COLORS.PANEL_TEXT }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', color: COLORS.PANEL_TEXT, fontSize: 10 }}>
         <thead>
           <tr style={{ color: COLORS.PANEL_TEXT_DIM, textAlign: 'left' }}>
             <th style={{ padding: '2px 4px' }}>Metric</th>
@@ -184,5 +228,31 @@ export function DispatchPanel() {
         </tbody>
       </table>
     </div>
+  )
+}
+
+function PolicyChip({
+  label, active, disabled, onClick,
+}: { label: string; active: boolean; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      style={{
+        background: active ? COLORS.BUTTON_ACTIVE : COLORS.BUTTON_BG,
+        color: disabled ? COLORS.PANEL_TEXT_DIM : COLORS.PANEL_TEXT,
+        border: `1px solid ${active ? COLORS.BUTTON_ACTIVE : COLORS.PANEL_BORDER}`,
+        borderRadius: 2,
+        padding: '2px 8px',
+        fontFamily: 'monospace',
+        fontSize: 10,
+        letterSpacing: '0.04em',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      {label}
+    </button>
   )
 }
