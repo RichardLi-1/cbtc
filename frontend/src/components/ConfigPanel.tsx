@@ -6,9 +6,10 @@ import { useEffect, useState } from 'react'
 import { useRuntimeStore } from '../store/runtimeStore'
 import { useTrainingStore } from '../store/trainingStore'
 import { COLORS } from '../constants/colors'
+import { cancelEvent, injectEvent } from '../api/client'
 import type { EventKind, RollingStockProfile } from '../types/domain'
 
-const EVENT_KINDS: EventKind[] = ['emergency_brake', 'door_fault', 'slow_speed', 'signal_fail']
+const EVENT_KINDS: EventKind[] = ['emergency_brake', 'door_fault', 'slow_speed', 'signal_fail', 'station_hold']
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -63,7 +64,13 @@ export function ConfigPanel({ open }: { open: boolean }) {
   } = useTrainingStore()
   const [newEventKind, setNewEventKind] = useState<EventKind>('emergency_brake')
   const [newEventTrain, setNewEventTrain] = useState('T01')
+  const [newEventSignal, setNewEventSignal] = useState('')
   const [newEventDur, setNewEventDur] = useState(30)
+  const [newEventDelay, setNewEventDelay] = useState(0)
+  const [newEventTsr, setNewEventTsr] = useState(25)
+  const [injectError, setInjectError] = useState<string | null>(null)
+
+  const activeIncidents = runtime?.ops?.injected_events ?? []
 
   useEffect(() => {
     if (!open) {
@@ -94,19 +101,29 @@ export function ConfigPanel({ open }: { open: boolean }) {
     })
   }
 
-  function addEvent() {
-    const evt = {
-      id: `evt_${Date.now()}`,
-      kind: newEventKind,
-      target_train_id: newEventTrain,
-      duration_s: newEventDur,
-      active: true,
+  async function addEvent() {
+    setInjectError(null)
+    try {
+      await injectEvent({
+        kind: newEventKind,
+        target_train_id: newEventKind === 'signal_fail' ? undefined : newEventTrain,
+        target_signal_id: newEventKind === 'signal_fail' ? newEventSignal : undefined,
+        speed_limit_kph: newEventKind === 'slow_speed' ? newEventTsr : undefined,
+        duration_s: newEventDur,
+        starts_in_s: newEventDelay,
+      })
+    } catch (err) {
+      setInjectError(String(err))
     }
-    updateConfig({ injected_events: [...config.injected_events, evt] })
   }
 
-  function removeEvent(id: string) {
-    updateConfig({ injected_events: config.injected_events.filter(e => e.id !== id) })
+  async function removeEvent(id: string) {
+    setInjectError(null)
+    try {
+      await cancelEvent(id)
+    } catch (err) {
+      setInjectError(String(err))
+    }
   }
 
   const panelStyle: React.CSSProperties = {
@@ -226,7 +243,7 @@ export function ConfigPanel({ open }: { open: boolean }) {
         </div>
       )}
       <div style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 9, fontFamily: 'monospace', marginBottom: 4 }}>
-        Requires ML API: python -m rlcbtc.cli.serve_training (port 8001)
+        ML API starts with npm run dev (port 8001). Retrain updates ml/models/deployed/ for all users.
       </div>
 
       {section('OPERATIONS')}
@@ -286,24 +303,42 @@ export function ConfigPanel({ open }: { open: boolean }) {
         >
           {(runtime?.trains ?? []).map(t => <option key={t.train_id} value={t.train_id}>{t.label}</option>)}
         </select>
+        {newEventKind === 'signal_fail' ? (
+          <select
+            value={newEventSignal}
+            onChange={e => setNewEventSignal(e.target.value)}
+            style={{ background: COLORS.BUTTON_BG, color: COLORS.PANEL_TEXT, border: `1px solid ${COLORS.PANEL_BORDER}`, borderRadius: 3, fontSize: 11, fontFamily: 'monospace', padding: '2px 4px', maxWidth: 120 }}
+          >
+            <option value="">signal</option>
+            {(runtime?.signals ?? []).map(s => <option key={s.signal_id} value={s.signal_id}>{s.signal_id}</option>)}
+          </select>
+        ) : null}
         <NumInput value={newEventDur} min={5} max={300} step={5} onChange={setNewEventDur} />
+        <NumInput value={newEventDelay} min={0} max={120} step={5} onChange={setNewEventDelay} />
+        {newEventKind === 'slow_speed' && (
+          <NumInput value={newEventTsr} min={5} max={80} step={5} onChange={setNewEventTsr} />
+        )}
         <button
-          onClick={addEvent}
+          onClick={() => void addEvent()}
           style={{ background: COLORS.BUTTON_ACTIVE, color: '#fff', border: 'none', borderRadius: 3, padding: '2px 10px', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}
         >
           Inject
         </button>
       </div>
-      {config.injected_events.length === 0 && (
+      {injectError && (
+        <div style={{ color: COLORS.ERROR_BANNER, fontSize: 10, fontFamily: 'monospace', marginBottom: 6 }}>{injectError}</div>
+      )}
+      {activeIncidents.length === 0 && (
         <div style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10, fontFamily: 'monospace' }}>No active events</div>
       )}
-      {config.injected_events.map(evt => (
+      {activeIncidents.map(evt => (
         <div key={evt.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
           <span style={{ color: COLORS.SIGNAL_YELLOW, fontFamily: 'monospace', fontSize: 10 }}>
-            [{evt.target_train_id}] {evt.kind} {evt.duration_s}s
+            {evt.active ? '●' : '○'} {evt.target_train_id ?? evt.target_signal_id ?? '—'} {evt.kind}
+            {evt.active ? ` ${evt.remaining_s.toFixed(0)}s` : ` in ${evt.starts_in_s.toFixed(0)}s`}
           </span>
           <button
-            onClick={() => removeEvent(evt.id)}
+            onClick={() => void removeEvent(evt.id)}
             style={{ background: 'none', border: 'none', color: COLORS.ERROR_BANNER, fontSize: 13, cursor: 'pointer', lineHeight: 1 }}
           >
             ×

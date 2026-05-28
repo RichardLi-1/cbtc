@@ -14,8 +14,9 @@ from pydantic import BaseModel
 import commands as cmd_api
 import topology
 import train
+from events import registry as event_registry
 from route_geom import ROUTE_LEN_M, chainage_to_edge
-from stations import YUS_BERTHS
+from stations import outbound_passenger_berths
 from sim import DT, simulation
 
 app = FastAPI()
@@ -39,6 +40,17 @@ class SignalCommandBody(BaseModel):
     aspect: str
 
 
+class InjectEventBody(BaseModel):
+    kind: str
+    duration_s: float = 30.0
+    starts_in_s: float = 0.0
+    target_train_id: str | None = None
+    target_signal_id: str | None = None
+    target_switch_id: str | None = None
+    speed_limit_kph: float | None = None
+    note: str = ""
+
+
 def _json_float(value: float | None) -> float | None:
     if value is None:
         return None
@@ -50,11 +62,24 @@ def _json_float(value: float | None) -> float | None:
 # Spread initial roster around the loop
 if train.lines and train.lines[0].trains:
     roster = train.lines[0].trains
-    n_berths = len(YUS_BERTHS)
+    ato_berths = outbound_passenger_berths()
+    n_berths = len(ato_berths)
+
+    def _nearest_stop_index(chainage_m: float) -> int:
+        if not ato_berths:
+            return 0
+        return min(
+            range(len(ato_berths)),
+            key=lambda idx: min(
+                abs(chainage_m - ato_berths[idx].chainage_m),
+                ROUTE_LEN_M - abs(chainage_m - ato_berths[idx].chainage_m),
+            ),
+        )
+
     for i, t in enumerate(roster):
         t.chainage_front_m = ROUTE_LEN_M * i / max(len(roster), 1)
         t.speed = 25.0
-        t.stop_index = (i * max(n_berths // max(len(roster), 1), 1)) % max(n_berths, 1)
+        t.stop_index = _nearest_stop_index(t.chainage_front_m)
         t.dwell_remaining_sec = 0.0
 
 
@@ -88,6 +113,48 @@ def post_switch_command(switch_id: str, body: SwitchCommandBody):
     return {"ok": True, "switch_id": switch_id, "state": body.state}
 
 
+@app.post("/events/inject")
+def post_inject_event(body: InjectEventBody):
+    try:
+        inc = event_registry.inject(
+            lines=train.lines,
+            kind=body.kind,
+            sim_time_s=simulation._sim_time_s,
+            duration_s=body.duration_s,
+            starts_in_s=body.starts_in_s,
+            target_train_id=body.target_train_id,
+            target_signal_id=body.target_signal_id,
+            target_switch_id=body.target_switch_id,
+            speed_limit_kph=body.speed_limit_kph,
+            note=body.note,
+            source="manual",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "ok": True,
+        "event": {
+            "id": inc.id,
+            "kind": inc.kind,
+            "target_train_id": inc.target_train_id,
+            "target_signal_id": inc.target_signal_id,
+            "duration_s": inc.duration_s,
+            "remaining_s": inc.remaining_s,
+            "starts_in_s": inc.starts_in_s,
+            "active": inc.active,
+        },
+    }
+
+
+@app.delete("/events/{event_id}")
+def delete_event(event_id: str):
+    try:
+        event_registry.cancel(event_id, lines=train.lines, sim_time_s=simulation._sim_time_s)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True}
+
+
 @app.post("/commands/signal/{signal_id}")
 def post_signal_command(signal_id: str, body: SignalCommandBody):
     try:
@@ -112,11 +179,9 @@ def get_state():
             brake_dist = (speed_mps**2) / (2.0 * 1.5)
             slack = _json_float(float(t.get("atp_slack_m") or 0.0))
             dwell = float(t.get("dwell_remaining_sec") or 0.0)
-            if t.get("e_brake"):
-                run_state = "running"
-            elif dwell > 0:
+            if dwell > 0 or t.get("at_station_name"):
                 run_state = "dwelling"
-            elif speed_kph < 15.0 and dwell == 0 and not t.get("at_station_name"):
+            elif speed_kph < 12.0:
                 run_state = "arriving"
             else:
                 run_state = "running"
@@ -163,10 +228,21 @@ def get_state():
             }
         )
 
+    line0 = train.lines[0] if train.lines else None
+    dispatch = simulation.dispatch_status(line0) if line0 is not None else None
+
+    ops: dict = {}
+    if dispatch is not None:
+        ops["dispatch"] = dispatch
+    ops["injected_events"] = event_registry.active_payload()
+    ops["event_log"] = event_registry.recent_log()
+
     return {
         "trains": trains_out,
         "blocks": blocks,
         "switches": switches,
         "signals": signals,
+        "ops": ops,
+        "sim_time_s": simulation._sim_time_s,
         "timestamp": time.time(),
     }

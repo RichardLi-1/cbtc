@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useEventsStore, type EventSeverity, type EventSource, type SimEvent } from '../store/eventsStore'
 import { useRuntimeStore } from '../store/runtimeStore'
 import { useTopologyStore } from '../store/topologyStore'
+import { injectEvent } from '../api/client'
 import { COLORS } from '../constants/colors'
 
 const SEV_COLOR: Record<EventSeverity, string> = {
@@ -17,9 +18,16 @@ const SRC_COLOR: Record<EventSource, string> = {
   manual: '#ffb74d',
 }
 
+const SERVICE_START_SEC = 6 * 3600
+
 function fmtSimT(t: number | null) {
-  if (t == null) return '——————'
-  return `T+${t.toFixed(1)}s`.padEnd(10, ' ')
+  if (t == null || !Number.isFinite(t)) return '--:--:--'
+  const total = Math.max(0, Math.floor(SERVICE_START_SEC + t))
+  const hh = Math.floor(total / 3600) % 24
+  const mm = Math.floor((total % 3600) / 60)
+  const ss = total % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(hh)}:${pad(mm)}:${pad(ss)}`
 }
 
 const PANEL_WIDTH = 340
@@ -27,6 +35,8 @@ const HEADER_H = 38
 
 export function EventsPanel() {
   const { events, paused, panelOpen, injectOpen, togglePaused, clear, setPanelOpen, setInjectOpen } = useEventsStore()
+  const runtime = useRuntimeStore((s) => s.runtime)
+  const dispatch = runtime?.ops?.dispatch
 
   if (!panelOpen) {
     return (
@@ -66,6 +76,14 @@ export function EventsPanel() {
         <MiniBtn label="✕" onClick={() => setPanelOpen(false)} title="Hide panel" />
       </div>
 
+      {dispatch && (
+        <div style={{ padding: '6px 10px', borderBottom: `1px solid ${COLORS.PANEL_BORDER}`, color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }}>
+          DISP count={dispatch.count}
+          {dispatch.next_due_in_s != null ? ` · next ~${Math.ceil(dispatch.next_due_in_s)}s` : ''}
+          {dispatch.blocked ? ' · BLOCKED' : ''}
+        </div>
+      )}
+
       {/* Inject toggle */}
       <div
         onClick={() => setInjectOpen(!injectOpen)}
@@ -95,16 +113,21 @@ export function EventsPanel() {
 }
 
 function EventRow({ e }: { e: SimEvent }) {
+  const planned = e.kind === 'PLAN'
   return (
     <div style={{
       padding: '4px 10px', borderBottom: `1px solid #0d1620`,
       display: 'grid', gridTemplateColumns: '64px 38px 36px 1fr', gap: 6, alignItems: 'baseline',
       fontSize: 11, lineHeight: 1.35,
+      opacity: planned ? 0.85 : 1,
+      fontStyle: planned ? 'italic' : 'normal',
     }}>
       <span style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }}>{fmtSimT(e.simT)}</span>
       <span style={{ color: SRC_COLOR[e.source], fontSize: 10, letterSpacing: '0.05em' }}>{e.source.toUpperCase()}</span>
-      <span style={{ color: SEV_COLOR[e.severity], fontSize: 10 }}>{e.kind}</span>
-      <span style={{ color: SEV_COLOR[e.severity] }}>{e.message}</span>
+      <span style={{ color: planned ? COLORS.PANEL_TEXT_DIM : SEV_COLOR[e.severity], fontSize: 10 }}>
+        {planned ? 'PLAN' : e.kind}
+      </span>
+      <span style={{ color: planned ? COLORS.PANEL_TEXT_DIM : SEV_COLOR[e.severity] }}>{e.message}</span>
     </div>
   )
 }
@@ -149,33 +172,68 @@ function InjectPane() {
       return topology?.switches.map((s) => s.id) ?? []
     }
     if (kind === 'speed_restrict') {
-      return topology?.edges.map((e) => e.id) ?? []
+      return runtime?.trains.map((t) => t.train_id) ?? []
+    }
+    if (kind === 'note') {
+      return []
     }
     return []
   }, [kind, runtime, topology])
 
   const targetLabel: Record<InjectKind, string> = {
     eb_apply: 'Train', eb_release: 'Train', station_hold: 'Train',
-    switch_fail: 'Switch', speed_restrict: 'Edge', note: '',
+    switch_fail: 'Switch', speed_restrict: 'Train', note: '',
   }
 
   const needsValue = kind === 'speed_restrict'
 
-  function submit() {
+  async function submit() {
     const meta = KIND_DEFAULTS[kind]
     const parts: string[] = [KIND_LABEL[kind]]
     if (target) parts.push(target)
     if (needsValue && value) parts.push(`${value} km/h`)
     if (note.trim()) parts.push(`— ${note.trim()}`)
-    const message = parts.join(' ')
 
-    append({ source: meta.source, severity: meta.severity, kind: meta.kind, message })
-
-    // Side effect: switch_fail flips the switch via existing command path
-    if (kind === 'switch_fail' && target) {
-      const cur = runtime?.switches.find((s) => s.switch_id === target)?.state
-      const next = cur === 'normal' ? 'reverse' : 'normal'
-      sendSwitchCommand(target, next)
+    try {
+      if (kind === 'note') {
+        await injectEvent({ kind: 'operator_note', note: note.trim() || parts.join(' ') })
+      } else if (kind === 'eb_apply' && target) {
+        await injectEvent({ kind: 'emergency_brake', target_train_id: target, duration_s: 30 })
+      } else if (kind === 'eb_release' && target) {
+        await injectEvent({ kind: 'emergency_brake_release', target_train_id: target, duration_s: 5 })
+      } else if (kind === 'speed_restrict' && target && value) {
+        await injectEvent({
+          kind: 'slow_speed',
+          target_train_id: target,
+          speed_limit_kph: Number(value),
+          duration_s: 120,
+          note: note.trim(),
+        })
+      } else if (kind === 'station_hold' && target) {
+        await injectEvent({ kind: 'station_hold', target_train_id: target, duration_s: 60, note: note.trim() })
+      } else if (kind === 'switch_fail' && target) {
+        const sw = topology?.switches.find((x) => x.id === target)
+        const sigOnEdge = topology?.signals.find((s) => s.edge_id === sw?.normal_edge_id)
+        if (sigOnEdge) {
+          await injectEvent({
+            kind: 'signal_fail',
+            target_signal_id: sigOnEdge.id,
+            duration_s: 45,
+            note: note.trim() || `switch ${target} failed`,
+          })
+        } else {
+          const cur = runtime?.switches.find((s) => s.switch_id === target)?.state
+          const next = cur === 'normal' ? 'reverse' : 'normal'
+          sendSwitchCommand(target, next)
+          await injectEvent({ kind: 'operator_note', note: note.trim() || `switch ${target} failed (no signal mapped)` })
+        }
+      } else {
+        append({ source: meta.source, severity: 'warn', kind: 'CMD', message: 'select a target' })
+        return
+      }
+    } catch {
+      append({ source: 'system', severity: 'error', kind: 'CMD', message: 'inject failed — is backend up?' })
+      return
     }
 
     setNote('')

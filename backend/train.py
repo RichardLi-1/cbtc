@@ -83,6 +83,11 @@ class Train:
         self.dwell_remaining_sec: float = 0.0
         self.at_station_name: str = ""
 
+        # Operator overrides (set via /commands/train/{id}/...)
+        self._op_hold: bool = False           # block dwell-release at next/current station
+        self._op_skip_remaining: int = 0      # cruise through this many upcoming station dwells
+        self._op_express: bool = False        # cruise through every dwell until cleared
+
     @property
     def position(self) -> float:
         """Backward-compat: nose chainage (m) along the loop."""
@@ -163,6 +168,9 @@ class Train:
         v_avg = 0.5 * (v_mps + v_mps_next)
         self.chainage_front_m = wrap_chainage(self.chainage_front_m + v_avg * dt, route_len)
         self.speed = abs(v_mps_next) * MPS_TO_KPH
+        cap_kph = getattr(self, "_speed_cap_kph", None)
+        if cap_kph is not None and self.speed > float(cap_kph):
+            self.speed = float(cap_kph)
 
 
 class Line:
@@ -171,7 +179,7 @@ class Line:
         self.trains = trains
 
 
-def _make_initial_roster(route_len: float, num_trains: int = 4) -> list[Train]:
+def _make_initial_roster(route_len: float, num_trains: int = 16) -> list[Train]:
     trains: list[Train] = []
     n = max(1, num_trains)
     for i in range(n):
@@ -215,7 +223,7 @@ def getState() -> str:
 
 
 def _default_line() -> Line:
-    return Line("YUS", _make_initial_roster(ROUTE_LEN_M, num_trains=4))
+    return Line("YUS", _make_initial_roster(ROUTE_LEN_M, num_trains=16))
 
 
 lines: list[Line] = [_default_line()]

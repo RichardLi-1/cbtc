@@ -1,4 +1,13 @@
-import type { Topology, RuntimeState, SwitchState, SignalAspect, TrainingStatus, TrainingSettings } from '../types/domain'
+import type {
+  Topology,
+  RuntimeState,
+  SwitchState,
+  SignalAspect,
+  TrainingStatus,
+  TrainingSettings,
+  DispatchComparison,
+  DispatchPolicyInfo,
+} from '../types/domain'
 import { MOCK_TOPOLOGY, tickMockRuntime } from '../mock/mockData'
 import { useConnectionStore } from '../store/connectionStore'
 
@@ -97,6 +106,31 @@ export async function commandSwitch(switchId: string, state: SwitchState): Promi
   }
 }
 
+export interface InjectEventRequest {
+  kind: string
+  duration_s?: number
+  starts_in_s?: number
+  target_train_id?: string
+  target_signal_id?: string
+  target_switch_id?: string
+  speed_limit_kph?: number
+  note?: string
+}
+
+export async function injectEvent(body: InjectEventRequest): Promise<{ ok: boolean; event: { id: string } }> {
+  if (MOCK_MODE) return { ok: true, event: { id: `mock_${Date.now()}` } }
+  return apiFetch('/events/inject', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export async function cancelEvent(eventId: string): Promise<void> {
+  if (MOCK_MODE) return
+  await apiFetch(`/events/${eventId}`, { method: 'DELETE' })
+}
+
 export async function commandSignal(signalId: string, aspect: SignalAspect): Promise<void> {
   if (MOCK_MODE) return
   try {
@@ -133,4 +167,46 @@ export async function startTraining(settings: TrainingSettings): Promise<Trainin
 export async function stopTraining(): Promise<TrainingStatus> {
   if (MOCK_MODE) return { status: 'stopped', running: false }
   return apiFetch<TrainingStatus>('/ml/training/stop', { method: 'POST' })
+}
+
+export async function fetchDispatchPolicy(): Promise<DispatchPolicyInfo> {
+  if (MOCK_MODE) {
+    return { path: 'mock', exists: false, size_bytes: 0 }
+  }
+  return apiFetch<DispatchPolicyInfo>('/ml/dispatch/policy')
+}
+
+export async function fetchDispatchComparison(): Promise<DispatchComparison> {
+  if (MOCK_MODE) throw new Error('mock mode')
+  return apiFetch<DispatchComparison>('/ml/dispatch/comparison')
+}
+
+export async function runDispatchCompare(body?: { episodes?: number; seed?: number }): Promise<DispatchComparison> {
+  if (MOCK_MODE) {
+    return {
+      seed: 42,
+      episodes: 5,
+      policy_path: 'mock',
+      rule_based: {
+        delay_mean_sec: 36,
+        delay_p95_sec: 78,
+        headway_std_mean_sec: 1933,
+        unsafe_action_rate: 0.19,
+        episodes: 5,
+      },
+      ppo: {
+        delay_mean_sec: 32,
+        delay_p95_sec: 70,
+        headway_std_mean_sec: 1800,
+        unsafe_action_rate: 0.15,
+        episodes: 5,
+      },
+      delta_pct: { delay_mean_sec_pct_vs_rule: 11.1 },
+    }
+  }
+  return apiFetch<DispatchComparison>('/ml/dispatch/compare', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body ?? {}),
+  })
 }

@@ -19,24 +19,33 @@ export function renderSwitchLayer(
 
     const state = swMap.get(sw.id) ?? sw.state
     const r = COLORS.SWITCH_RADIUS
+    const color = state === 'reverse' ? COLORS.SWITCH_REVERSE : COLORS.SWITCH_NORMAL
 
+    // Dark backing disc so the X reads against the track and block fill.
     ctx.beginPath()
-    if (state === 'reverse') {
-      // Diamond for reverse
-      ctx.moveTo(sx, sy - r)
-      ctx.lineTo(sx + r, sy)
-      ctx.lineTo(sx, sy + r)
-      ctx.lineTo(sx - r, sy)
-      ctx.closePath()
-      ctx.fillStyle = COLORS.SWITCH_REVERSE
-    } else {
-      // Circle for normal
-      ctx.arc(sx, sy, r, 0, Math.PI * 2)
-      ctx.fillStyle = COLORS.SWITCH_NORMAL
-    }
+    ctx.arc(sx, sy, r + 1, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
     ctx.fill()
-    ctx.strokeStyle = COLORS.PANEL_BORDER
-    ctx.lineWidth = 1
+
+    // X glyph — two crossing strokes. The active leg (matching switch state)
+    // is drawn in the state color; the inactive leg is dim.
+    const activeStroke = color
+    const idleStroke   = 'rgba(255, 255, 255, 0.35)'
+    ctx.lineCap = 'round'
+    ctx.lineWidth = 2
+
+    // Leg A: top-left ↘ bottom-right  (normal route)
+    ctx.beginPath()
+    ctx.moveTo(sx - r, sy - r)
+    ctx.lineTo(sx + r, sy + r)
+    ctx.strokeStyle = state === 'normal' ? activeStroke : idleStroke
+    ctx.stroke()
+
+    // Leg B: top-right ↙ bottom-left  (reverse route)
+    ctx.beginPath()
+    ctx.moveTo(sx + r, sy - r)
+    ctx.lineTo(sx - r, sy + r)
+    ctx.strokeStyle = state === 'reverse' ? activeStroke : idleStroke
     ctx.stroke()
 
     // Small label at higher zoom

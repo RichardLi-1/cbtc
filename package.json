@@ -1,0 +1,16 @@
+{
+  "name": "cbtc",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "setup": "bash ./scripts/setup.sh",
+    "dev": "bash ./dev.sh",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "cd backend && ./venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+    "dev:ml": "cd ml && ./.venv/bin/python -m rlcbtc.cli.serve_training --host 0.0.0.0 --port 8001",
+    "build:frontend": "npm run build --prefix frontend",
+    "test:frontend": "npm run test --prefix frontend",
+    "test:ml": "cd ml && ./.venv/bin/python -m pytest",
+    "compare:dispatch": "cd ml && ./.venv/bin/python -c \"from rlcbtc.api.dispatch_service import compare_dispatch; import json; print(json.dumps(compare_dispatch(), indent=2))\""
+  }
+}

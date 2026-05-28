@@ -21,6 +21,18 @@ function formatDate(d: Date) {
   return d.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: '2-digit' })
 }
 
+const SERVICE_START_SEC = 6 * 3600  // 06:00 revenue start
+
+function formatSimClock(simT: number | null | undefined): string {
+  if (simT == null || !Number.isFinite(simT)) return '--:--:--'
+  const total = Math.max(0, Math.floor(SERVICE_START_SEC + simT))
+  const hh = Math.floor(total / 3600) % 24
+  const mm = Math.floor((total % 3600) / 60)
+  const ss = total % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(hh)}:${pad(mm)}:${pad(ss)}`
+}
+
 interface BtnProps {
   label: string
   active?: boolean
@@ -79,7 +91,7 @@ export function ControlPanel() {
   const { mockMode } = useConnectionStore()
   const setInfoOpen = useUiStore((s) => s.setInfoOpen)
 
-  const ts = runtime?.timestamp?.toFixed(1) ?? '—'
+  const simClock = formatSimClock(runtime?.sim_time_s)
   const now = useWallClock()
 
   return (
@@ -112,9 +124,12 @@ export function ControlPanel() {
         {formatDate(now)}
       </span>
 
-      {/* Sim clock */}
-      <span style={{ color: COLORS.PANEL_TEXT_DIM, fontFamily: 'monospace', fontSize: 11 }}>
-        T+{ts}s
+      {/* Sim clock (HH:MM:SS from 06:00 service start) */}
+      <span
+        title="Simulated service time (starts 06:00)"
+        style={{ color: COLORS.PANEL_TEXT_DIM, fontFamily: 'monospace', fontSize: 11 }}
+      >
+        SIM {simClock}
       </span>
 
       {/* Endpoint health dots */}

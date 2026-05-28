@@ -7,6 +7,7 @@ import { ConfigPanel } from './components/ConfigPanel'
 import { BackendNotice } from './components/BackendNotice'
 import { InfoPopup } from './components/InfoPopup'
 import { EventsPanel } from './components/EventsPanel'
+import { DispatchPanel } from './components/DispatchPanel'
 import { useUiStore } from './store/uiStore'
 import './store/eventsStore'
 import { COLORS } from './constants/colors'
@@ -43,6 +44,7 @@ export default function App() {
         <CanvasView />
       </div>
       <EventsPanel />
+      <DispatchPanel />
       <ConfigPanel open={configOpen} />
       <InfoPopup open={infoOpen} onClose={() => setInfoOpen(false)} />
     </div>

@@ -41,3 +41,7 @@ def switch_state(switch_id: str, default: str) -> str:
 
 def signal_aspect(signal_id: str, computed: str) -> str:
     return _signal_overrides.get(signal_id, computed)
+
+
+def clear_signal_override(signal_id: str) -> None:
+    _signal_overrides.pop(signal_id, None)

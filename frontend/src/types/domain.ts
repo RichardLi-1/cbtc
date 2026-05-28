@@ -72,6 +72,8 @@ export interface TrainPosition {
   /** Metres per second (mock and GET /state). */
   speed: number
   state: TrainState
+  station_name?: string | null
+  dwell_remaining_sec?: number
   safe_zone_front: number
   safe_zone_rear: number
   atp_slack_m?: number
@@ -98,6 +100,19 @@ export interface RuntimeState {
   blocks: BlockRuntime[]
   switches: SwitchRuntime[]
   signals: SignalRuntime[]
+  ops?: {
+    dispatch?: {
+      count: number
+      last_dispatch_sim_t?: number | null
+      next_due_in_s?: number
+      blocked?: boolean
+      max_trains?: number
+    }
+    injected_events?: InjectedEventRuntime[]
+    event_log?: EventLogRow[]
+  }
+  /** Monotonic sim clock (seconds since backend sim start). */
+  sim_time_s?: number
   timestamp: number
 }
 
@@ -132,8 +147,40 @@ export interface SimConfig {
   injected_events: InjectedEvent[]
 }
 
-export type EventKind = 'emergency_brake' | 'door_fault' | 'slow_speed' | 'signal_fail'
+export type EventKind =
+  | 'emergency_brake'
+  | 'emergency_brake_release'
+  | 'door_fault'
+  | 'slow_speed'
+  | 'signal_fail'
+  | 'station_hold'
+  | 'operator_note'
 
+export interface InjectedEventRuntime {
+  id: string
+  kind: string
+  target_train_id?: string | null
+  target_signal_id?: string | null
+  target_switch_id?: string | null
+  duration_s: number
+  remaining_s: number
+  starts_in_s: number
+  speed_limit_kph?: number | null
+  note?: string
+  source?: string
+  active: boolean
+  created_sim_t?: number
+}
+
+export interface EventLogRow {
+  severity: 'info' | 'warn' | 'error'
+  kind: string
+  message: string
+  source: string
+  sim_t: number
+}
+
+/** @deprecated local-only; use ops.injected_events from /state */
 export interface InjectedEvent {
   id: string
   kind: EventKind
@@ -162,4 +209,34 @@ export interface TrainingSettings {
   persist_checkpoints: boolean
   resume: boolean
   config: string
+}
+
+// ── Dispatch A/B (ML API) ───────────────────────────────────────────────────
+
+export interface DispatchMetrics {
+  delay_mean_sec: number
+  delay_p95_sec: number
+  headway_std_mean_sec: number
+  unsafe_action_rate: number
+  episodes: number
+}
+
+export interface DispatchComparison {
+  seed: number
+  episodes: number
+  policy_path: string
+  rule_based: DispatchMetrics
+  ppo: DispatchMetrics
+  delta_pct: {
+    delay_mean_sec_pct_vs_rule?: number | null
+    delay_p95_sec_pct_vs_rule?: number | null
+    headway_std_mean_sec_pct_vs_rule?: number | null
+    unsafe_action_rate_pct_vs_rule?: number | null
+  }
+}
+
+export interface DispatchPolicyInfo {
+  path: string
+  exists: boolean
+  size_bytes: number
 }
