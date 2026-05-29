@@ -59,7 +59,7 @@ export function EventsPanel() {
   return (
     <div
       style={{
-        position: 'absolute', top: HEADER_H, right: 0, bottom: 0, width: PANEL_WIDTH, zIndex: 60,
+        position: 'absolute', top: HEADER_H, right: 0, bottom: 0, width: PANEL_WIDTH, maxWidth: '100vw', zIndex: 60,
         background: COLORS.PANEL_BG, borderLeft: `1px solid ${COLORS.PANEL_BORDER}`,
         display: 'flex', flexDirection: 'column',
         fontFamily: 'monospace', fontSize: 11, color: COLORS.PANEL_TEXT,

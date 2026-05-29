@@ -31,10 +31,16 @@ interface EventsStore {
 
 let _nextId = 1
 
+// Collapse the events panel by default on phone-sized screens so it doesn't
+// cover the canvas. Resolved once at init to keep the first paint stable (an
+// open→closed flip after mount would register as layout shift).
+const _startCollapsed =
+  typeof window !== 'undefined' && window.matchMedia('(max-width: 719px)').matches
+
 export const useEventsStore = create<EventsStore>((set, get) => ({
   events: [],
   paused: false,
-  panelOpen: true,
+  panelOpen: !_startCollapsed,
   injectOpen: false,
   append: (e) => {
     if (get().paused) return

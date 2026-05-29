@@ -43,7 +43,7 @@ export function EventsPanel() {
             }, title: "Open events panel", children: ["EVENTS \u25C0 ", events.length > 0 && _jsxs("span", { style: { color: COLORS.PANEL_TEXT_DIM }, children: ["(", events.length, ")"] })] }));
     }
     return (_jsxs("div", { style: {
-            position: 'absolute', top: HEADER_H, right: 0, bottom: 0, width: PANEL_WIDTH, zIndex: 60,
+            position: 'absolute', top: HEADER_H, right: 0, bottom: 0, width: PANEL_WIDTH, maxWidth: '100vw', zIndex: 60,
             background: COLORS.PANEL_BG, borderLeft: `1px solid ${COLORS.PANEL_BORDER}`,
             display: 'flex', flexDirection: 'column',
             fontFamily: 'monospace', fontSize: 11, color: COLORS.PANEL_TEXT,

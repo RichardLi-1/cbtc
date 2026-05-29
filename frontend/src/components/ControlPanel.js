@@ -6,6 +6,7 @@ import { useConnectionStore } from '../store/connectionStore';
 import { useUiStore } from '../store/uiStore';
 import { COLORS } from '../constants/colors';
 import { isMlEnabled } from '../config/ml';
+import { useIsMobile } from '../hooks/useIsMobile';
 function useWallClock() {
     const [now, setNow] = useState(() => new Date());
     useEffect(() => {
@@ -65,6 +66,7 @@ export function ControlPanel() {
     const setInfoOpen = useUiStore((s) => s.setInfoOpen);
     const simClock = formatSimClock(runtime?.sim_time_s);
     const now = useWallClock();
+    const isMobile = useIsMobile();
     return (_jsxs("div", { style: {
             position: 'absolute',
             top: 0,
@@ -78,6 +80,13 @@ export function ControlPanel() {
             gap: 10,
             padding: '0 14px',
             zIndex: 50,
+            // On phones the bar overflows its width. Scroll it horizontally instead
+            // of letting items reflow — async-appearing badges (MOCK/STALE) would
+            // otherwise shove the right-aligned buttons sideways (layout shift).
+            overflowX: isMobile ? 'auto' : 'hidden',
+            overflowY: 'hidden',
+            whiteSpace: 'nowrap',
+            scrollbarWidth: 'none',
         }, children: [_jsx("span", { style: { color: COLORS.PANEL_TEXT, fontFamily: 'monospace', fontSize: 12, letterSpacing: '0.08em', marginRight: 8 }, children: "CBTC DISPATCH" }), _jsx("span", { style: { color: COLORS.PANEL_TEXT, fontFamily: 'monospace', fontSize: 12, letterSpacing: '0.06em' }, children: formatClock(now) }), _jsx("span", { style: { color: COLORS.PANEL_TEXT_DIM, fontFamily: 'monospace', fontSize: 11 }, children: formatDate(now) }), _jsxs("span", { title: "Simulated service time (starts 06:00)", style: { color: COLORS.PANEL_TEXT_DIM, fontFamily: 'monospace', fontSize: 11 }, children: ["SIM ", simClock] }), _jsx(EndpointDot, { ep: "topology", label: "/topology" }), _jsx(EndpointDot, { ep: "state", label: "/state" }), _jsx(EndpointDot, { ep: "commands", label: "/commands" }), isMlEnabled() && _jsx(EndpointDot, { ep: "ml", label: "/ml" }), mockMode && (_jsx("span", { style: { color: COLORS.SIGNAL_YELLOW, fontFamily: 'monospace', fontSize: 10, border: `1px solid ${COLORS.SIGNAL_YELLOW}`, padding: '1px 5px', borderRadius: 2 }, children: "MOCK" })), stale && (_jsx("span", { style: { color: COLORS.STALE_BANNER, fontFamily: 'monospace', fontSize: 11 }, children: "\u26A0 STALE DATA" })), commandError && (_jsxs("span", { onClick: clearCommandError, style: { color: COLORS.ERROR_BANNER, fontFamily: 'monospace', fontSize: 11, cursor: 'pointer', background: '#1a0000', padding: '2px 6px', borderRadius: 2 }, title: "Click to dismiss", children: ["\u2715 ", commandError] })), _jsx("div", { style: { flex: 1 } }), _jsx("a", { href: "https://github.com/RichardLi-1/cbtc", target: "_blank", rel: "noopener noreferrer", title: "View source on GitHub", style: {
                     background: COLORS.BUTTON_BG,
                     color: COLORS.PANEL_TEXT,

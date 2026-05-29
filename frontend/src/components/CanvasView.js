@@ -53,6 +53,10 @@ export function CanvasView() {
     // Drag state (not in React state — avoids re-renders during pan)
     const dragging = useRef(false);
     const lastMouse = useRef({ x: 0, y: 0 });
+    // Touch state — single-finger pan + two-finger pinch zoom (mobile)
+    const lastTouch = useRef({ x: 0, y: 0 });
+    const pinchDist = useRef(0);
+    const touchMoved = useRef(false);
     const [hovered, setHovered] = useState(null);
     const { topology } = useTopologyStore();
     const { setHovered: storeSetHovered, sendSwitchCommand, sendSignalCommand } = useRuntimeStore();
@@ -173,7 +177,11 @@ export function CanvasView() {
     }, []);
     const onClick = useCallback((e) => {
         if (Math.abs(e.movementX) + Math.abs(e.movementY) > 4)
-            return; // was a drag
+            return; // was a mouse drag
+        if (touchMoved.current) {
+            touchMoved.current = false;
+            return;
+        } // was a touch pan/pinch
         const topo = useTopologyStore.getState().topology;
         const rt = useRuntimeStore.getState().runtime;
         if (!topo || !rt)
@@ -198,6 +206,39 @@ export function CanvasView() {
             sendSignalCommand(hit.id, next);
         }
     }, [sendSwitchCommand, sendSignalCommand]);
+    // ── Touch events (mobile): 1 finger pans, 2 fingers pinch-zoom ───────────
+    const onTouchStart = useCallback((e) => {
+        setHovered(null);
+        touchMoved.current = false;
+        if (e.touches.length === 1) {
+            lastTouch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+        else if (e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            pinchDist.current = Math.hypot(dx, dy);
+        }
+    }, []);
+    const onTouchMove = useCallback((e) => {
+        touchMoved.current = true;
+        if (e.touches.length === 1) {
+            const t = e.touches[0];
+            vp.pan(t.clientX - lastTouch.current.x, t.clientY - lastTouch.current.y);
+            lastTouch.current = { x: t.clientX, y: t.clientY };
+        }
+        else if (e.touches.length === 2) {
+            const [a, b] = [e.touches[0], e.touches[1]];
+            const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+            if (pinchDist.current > 0) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const midX = (a.clientX + b.clientX) / 2 - rect.left;
+                const midY = (a.clientY + b.clientY) / 2 - rect.top;
+                vp.zoomAtPoint(dist / pinchDist.current, midX, midY);
+            }
+            pinchDist.current = dist;
+        }
+    }, []);
+    const onTouchEnd = useCallback(() => { pinchDist.current = 0; }, []);
     // Double-click: fit to bounds
     const onDoubleClick = useCallback(() => {
         const topo = useTopologyStore.getState().topology;
@@ -212,5 +253,5 @@ export function CanvasView() {
     }, []);
     const { topology: topoForTooltip, } = useTopologyStore();
     const { runtime: rtForTooltip } = useRuntimeStore();
-    return (_jsxs(_Fragment, { children: [_jsx("canvas", { ref: canvasRef, style: { display: 'block', width: '100%', height: '100%', cursor: dragging.current ? 'grabbing' : 'crosshair' }, onMouseDown: onMouseDown, onMouseMove: onMouseMove, onMouseUp: onMouseUp, onMouseLeave: onMouseLeave, onWheel: onWheel, onClick: onClick, onDoubleClick: onDoubleClick }), hovered && topoForTooltip && rtForTooltip && (_jsx(Tooltip, { hovered: hovered, topology: topoForTooltip, runtime: rtForTooltip }))] }));
+    return (_jsxs(_Fragment, { children: [_jsx("canvas", { ref: canvasRef, style: { display: 'block', width: '100%', height: '100%', touchAction: 'none', cursor: dragging.current ? 'grabbing' : 'crosshair' }, onMouseDown: onMouseDown, onMouseMove: onMouseMove, onMouseUp: onMouseUp, onMouseLeave: onMouseLeave, onWheel: onWheel, onClick: onClick, onDoubleClick: onDoubleClick, onTouchStart: onTouchStart, onTouchMove: onTouchMove, onTouchEnd: onTouchEnd, onTouchCancel: onTouchEnd }), hovered && topoForTooltip && rtForTooltip && (_jsx(Tooltip, { hovered: hovered, topology: topoForTooltip, runtime: rtForTooltip }))] }));
 }

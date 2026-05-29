@@ -13,8 +13,13 @@ function pct(n) {
     const sign = n >= 0 ? '+' : '';
     return `${sign}${n.toFixed(1)}%`;
 }
+// Start collapsed on phone-sized screens: the panel is bottom-anchored and
+// grows upward as async data arrives, so leaving it open on mobile both covers
+// the canvas and registers as cumulative layout shift. Resolved once at module
+// load to keep the first paint stable.
+const START_COLLAPSED_MOBILE = typeof window !== 'undefined' && window.matchMedia('(max-width: 719px)').matches;
 export function DispatchPanel() {
-    const [open, setOpen] = useState(true);
+    const [open, setOpen] = useState(!START_COLLAPSED_MOBILE);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [policyReady, setPolicyReady] = useState(null);

@@ -5,6 +5,7 @@ import { useConnectionStore, type EndpointHealth, type EndpointKey } from '../st
 import { useUiStore } from '../store/uiStore'
 import { COLORS } from '../constants/colors'
 import { isMlEnabled } from '../config/ml'
+import { useIsMobile } from '../hooks/useIsMobile'
 
 function useWallClock() {
   const [now, setNow] = useState(() => new Date())
@@ -95,6 +96,7 @@ export function ControlPanel() {
 
   const simClock = formatSimClock(runtime?.sim_time_s)
   const now = useWallClock()
+  const isMobile = useIsMobile()
 
   return (
     <div
@@ -111,6 +113,13 @@ export function ControlPanel() {
         gap: 10,
         padding: '0 14px',
         zIndex: 50,
+        // On phones the bar overflows its width. Scroll it horizontally instead
+        // of letting items reflow — async-appearing badges (MOCK/STALE) would
+        // otherwise shove the right-aligned buttons sideways (layout shift).
+        overflowX: isMobile ? 'auto' : 'hidden',
+        overflowY: 'hidden',
+        whiteSpace: 'nowrap',
+        scrollbarWidth: 'none',
       }}
     >
       {/* Title */}
