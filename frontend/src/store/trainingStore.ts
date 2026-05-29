@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import posthog from 'posthog-js'
 import { fetchTrainingStatus, startTraining, stopTraining } from '../api/client'
 import type { TrainingStatus } from '../types/domain'
 
@@ -89,8 +90,10 @@ export const useTrainingStore = create<TrainingStore>((set, get) => {
           resume: resumeTraining,
         })
         set({ status })
+        posthog.capture('training_started', { config: configName, persist_checkpoints: persistCheckpoints, resume: resumeTraining })
         get().startPolling()
       } catch (err) {
+        posthog.captureException(err instanceof Error ? err : new Error(String(err)), { config: configName })
         set({ error: String(err) })
       }
     },
@@ -99,7 +102,9 @@ export const useTrainingStore = create<TrainingStore>((set, get) => {
       try {
         const status = await stopTraining()
         set({ status })
+        posthog.capture('training_stopped')
       } catch (err) {
+        posthog.captureException(err instanceof Error ? err : new Error(String(err)))
         set({ error: String(err) })
       }
     },
