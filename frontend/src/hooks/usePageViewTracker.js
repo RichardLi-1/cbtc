@@ -42,6 +42,13 @@ export function usePageViewTracker() {
         // so the param disappears immediately for the visitor.
         // 📖 history.replaceState — https://developer.mozilla.org/en-US/docs/Web/API/History/replaceState
         const params = new URLSearchParams(window.location.search);
+        // ?m is my own opt-out marker: silence this load and persist skip_tracking
+        // so future visits from this browser stay quiet too. Strip it and bail.
+        if (params.has('m')) {
+            localStorage.setItem('skip_tracking', '1');
+            window.history.replaceState({}, '', window.location.pathname);
+            return;
+        }
         const rawParams = params.toString();
         let referralSource = null;
         for (const key of params.keys()) {
