@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import posthog from 'posthog-js'
 import { fetchDispatchComparison, fetchDispatchPolicy, runDispatchCompare } from '../api/client'
 import { useRuntimeStore } from '../store/runtimeStore'
 import type { DispatchComparison } from '../types/domain'
@@ -40,7 +41,9 @@ export function DispatchPanel() {
     try {
       const result = await runDispatchCompare({})
       setData(result)
+      posthog.capture('dispatch_comparison_run', { episodes: result.episodes, seed: result.seed })
     } catch (err) {
+      posthog.captureException(err instanceof Error ? err : new Error(String(err)))
       setError(String(err))
     } finally {
       setLoading(false)
@@ -140,13 +143,13 @@ export function DispatchPanel() {
           <PolicyChip
             label="Rule-based"
             active={livePolicy === 'rule'}
-            onClick={() => setLivePolicy('rule')}
+            onClick={() => { setLivePolicy('rule'); posthog.capture('dispatch_policy_switched', { policy: 'rule' }) }}
           />
           <PolicyChip
             label={`PPO ${policyReady === false ? '(offline)' : '(beta)'}`}
             active={livePolicy === 'ppo'}
             disabled={policyReady === false}
-            onClick={() => setLivePolicy('ppo')}
+            onClick={() => { setLivePolicy('ppo'); posthog.capture('dispatch_policy_switched', { policy: 'ppo' }) }}
           />
           <span style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 9 }}>
             {livePolicy === 'ppo' ? 'switch is UI-only — live loop runs the rule policy' : ''}

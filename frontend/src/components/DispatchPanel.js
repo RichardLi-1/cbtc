@@ -1,5 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useCallback, useEffect, useState } from 'react';
+import posthog from 'posthog-js';
 import { fetchDispatchComparison, fetchDispatchPolicy, runDispatchCompare } from '../api/client';
 import { useRuntimeStore } from '../store/runtimeStore';
 import { COLORS } from '../constants/colors';
@@ -35,8 +36,10 @@ export function DispatchPanel() {
         try {
             const result = await runDispatchCompare({});
             setData(result);
+            posthog.capture('dispatch_comparison_run', { episodes: result.episodes, seed: result.seed });
         }
         catch (err) {
+            posthog.captureException(err instanceof Error ? err : new Error(String(err)));
             setError(String(err));
         }
         finally {
@@ -88,7 +91,7 @@ export function DispatchPanel() {
                     background: '#08121a', border: `1px solid ${COLORS.PANEL_BORDER}`, borderRadius: 3,
                 }, children: [_jsx("div", { style: { color: COLORS.PANEL_TEXT_DIM, fontSize: 9, letterSpacing: '0.12em', marginBottom: 4 }, children: "LIVE" }), _jsxs("div", { style: { display: 'flex', gap: 14, color: COLORS.PANEL_TEXT, fontSize: 11 }, children: [_jsxs("span", { children: ["Dispatched: ", _jsx("b", { children: dispatchStatus?.count ?? 0 })] }), _jsxs("span", { children: ["Next:", ' ', dispatchStatus?.blocked
                                         ? _jsx("span", { style: { color: COLORS.SIGNAL_YELLOW }, children: "blocked" })
-                                        : _jsxs("span", { children: ["~", Math.max(0, Math.ceil(dispatchStatus?.next_due_in_s ?? 0)), "s"] })] }), _jsxs("span", { children: ["Max: ", _jsx("b", { children: dispatchStatus?.max_trains ?? '—' })] })] }), _jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }, children: [_jsx("span", { style: { letterSpacing: '0.1em' }, children: "POLICY" }), _jsx(PolicyChip, { label: "Rule-based", active: livePolicy === 'rule', onClick: () => setLivePolicy('rule') }), _jsx(PolicyChip, { label: `PPO ${policyReady === false ? '(offline)' : '(beta)'}`, active: livePolicy === 'ppo', disabled: policyReady === false, onClick: () => setLivePolicy('ppo') }), _jsx("span", { style: { color: COLORS.PANEL_TEXT_DIM, fontSize: 9 }, children: livePolicy === 'ppo' ? 'switch is UI-only — live loop runs the rule policy' : '' })] })] }), _jsxs("div", { style: { color: COLORS.PANEL_TEXT_DIM, marginBottom: 8, lineHeight: 1.4, fontSize: 10 }, children: [_jsx("b", { children: "A/B compare" }), " runs both policies offline on the same seed and reports the deltas below.", policyReady === false && (_jsx("span", { style: { color: COLORS.ERROR_BANNER, display: 'block', marginTop: 4 }, children: "ML API or policy missing \u2014 run npm run setup && npm run dev" }))] }), _jsxs("div", { style: { display: 'flex', gap: 8, marginBottom: 10 }, children: [_jsx("button", { type: "button", disabled: loading, onClick: () => void runCompare(), style: {
+                                        : _jsxs("span", { children: ["~", Math.max(0, Math.ceil(dispatchStatus?.next_due_in_s ?? 0)), "s"] })] }), _jsxs("span", { children: ["Max: ", _jsx("b", { children: dispatchStatus?.max_trains ?? '—' })] })] }), _jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }, children: [_jsx("span", { style: { letterSpacing: '0.1em' }, children: "POLICY" }), _jsx(PolicyChip, { label: "Rule-based", active: livePolicy === 'rule', onClick: () => { setLivePolicy('rule'); posthog.capture('dispatch_policy_switched', { policy: 'rule' }); } }), _jsx(PolicyChip, { label: `PPO ${policyReady === false ? '(offline)' : '(beta)'}`, active: livePolicy === 'ppo', disabled: policyReady === false, onClick: () => { setLivePolicy('ppo'); posthog.capture('dispatch_policy_switched', { policy: 'ppo' }); } }), _jsx("span", { style: { color: COLORS.PANEL_TEXT_DIM, fontSize: 9 }, children: livePolicy === 'ppo' ? 'switch is UI-only — live loop runs the rule policy' : '' })] })] }), _jsxs("div", { style: { color: COLORS.PANEL_TEXT_DIM, marginBottom: 8, lineHeight: 1.4, fontSize: 10 }, children: [_jsx("b", { children: "A/B compare" }), " runs both policies offline on the same seed and reports the deltas below.", policyReady === false && (_jsx("span", { style: { color: COLORS.ERROR_BANNER, display: 'block', marginTop: 4 }, children: "ML API or policy missing \u2014 run npm run setup && npm run dev" }))] }), _jsxs("div", { style: { display: 'flex', gap: 8, marginBottom: 10 }, children: [_jsx("button", { type: "button", disabled: loading, onClick: () => void runCompare(), style: {
                             background: COLORS.BUTTON_ACTIVE,
                             color: '#fff',
                             border: 'none',

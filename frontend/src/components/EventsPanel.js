@@ -1,5 +1,6 @@
 import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
 import { useState, useMemo } from 'react';
+import posthog from 'posthog-js';
 import { useEventsStore } from '../store/eventsStore';
 import { useRuntimeStore } from '../store/runtimeStore';
 import { useTopologyStore } from '../store/topologyStore';
@@ -163,10 +164,12 @@ function InjectPane() {
                 return;
             }
         }
-        catch {
+        catch (err) {
+            posthog.captureException(err instanceof Error ? err : new Error(String(err)), { inject_kind: kind, target });
             append({ source: 'system', severity: 'error', kind: 'CMD', message: 'inject failed — is backend up?' });
             return;
         }
+        posthog.capture('event_injected', { kind, target, ...(needsValue && value ? { speed_limit_kph: Number(value) } : {}) });
         setNote('');
         setValue('');
     }

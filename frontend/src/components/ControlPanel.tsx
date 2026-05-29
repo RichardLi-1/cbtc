@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
+import posthog from 'posthog-js'
 import { useRuntimeStore } from '../store/runtimeStore'
 import { useConnectionStore, type EndpointHealth, type EndpointKey } from '../store/connectionStore'
 import { useUiStore } from '../store/uiStore'
 import { COLORS } from '../constants/colors'
+import { isMlEnabled } from '../config/ml'
 
 function useWallClock() {
   const [now, setNow] = useState(() => new Date())
@@ -136,6 +138,7 @@ export function ControlPanel() {
       <EndpointDot ep="topology" label="/topology" />
       <EndpointDot ep="state" label="/state" />
       <EndpointDot ep="commands" label="/commands" />
+      {isMlEnabled() && <EndpointDot ep="ml" label="/ml" />}
 
       {/* Mock badge */}
       {mockMode && (
@@ -164,7 +167,27 @@ export function ControlPanel() {
 
       <div style={{ flex: 1 }} />
 
-      <Btn label="INFO" onClick={() => setInfoOpen(true)} />
+      <a
+        href="https://github.com/RichardLi-1/cbtc"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="View source on GitHub"
+        style={{
+          background: COLORS.BUTTON_BG,
+          color: COLORS.PANEL_TEXT,
+          border: `1px solid ${COLORS.PANEL_BORDER}`,
+          borderRadius: 3,
+          padding: '3px 10px',
+          fontSize: 11,
+          fontFamily: 'monospace',
+          letterSpacing: '0.03em',
+          textDecoration: 'none',
+        }}
+      >
+        GITHUB
+      </a>
+
+      <Btn label="INFO" onClick={() => { setInfoOpen(true); posthog.capture('info_panel_viewed') }} />
       <Btn label={showSafeZones ? 'SAFE ZONES ●' : 'SAFE ZONES ○'} active={showSafeZones} onClick={toggleSafeZones} />
       <Btn label={showLabels ? 'LABELS ●' : 'LABELS ○'} active={showLabels} onClick={toggleLabels} />
 

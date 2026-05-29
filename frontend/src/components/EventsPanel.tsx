@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import posthog from 'posthog-js'
 import { useEventsStore, type EventSeverity, type EventSource, type SimEvent } from '../store/eventsStore'
 import { useRuntimeStore } from '../store/runtimeStore'
 import { useTopologyStore } from '../store/topologyStore'
@@ -231,11 +232,13 @@ function InjectPane() {
         append({ source: meta.source, severity: 'warn', kind: 'CMD', message: 'select a target' })
         return
       }
-    } catch {
+    } catch (err) {
+      posthog.captureException(err instanceof Error ? err : new Error(String(err)), { inject_kind: kind, target })
       append({ source: 'system', severity: 'error', kind: 'CMD', message: 'inject failed — is backend up?' })
       return
     }
 
+    posthog.capture('event_injected', { kind, target, ...(needsValue && value ? { speed_limit_kph: Number(value) } : {}) })
     setNote('')
     setValue('')
   }
