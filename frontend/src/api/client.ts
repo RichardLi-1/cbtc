@@ -1,3 +1,4 @@
+import posthog from 'posthog-js'
 import type {
   Topology,
   RuntimeState,
@@ -8,6 +9,7 @@ import type {
   DispatchComparison,
   DispatchPolicyInfo,
 } from '../types/domain'
+import { isMlEnabled } from '../config/ml'
 import { MOCK_TOPOLOGY, tickMockRuntime } from '../mock/mockData'
 import { useConnectionStore } from '../store/connectionStore'
 
@@ -26,6 +28,7 @@ export let MOCK_MODE = false
 export function enableMockMode() {
   MOCK_MODE = true
   useConnectionStore.getState().setMockMode(true)
+  posthog.capture('simulation_mock_mode_enabled')
 }
 export function disableMockMode() {
   MOCK_MODE = false
@@ -105,8 +108,10 @@ export async function commandSwitch(switchId: string, state: SwitchState): Promi
       body: JSON.stringify({ state }),
     })
     useConnectionStore.getState().report('commands', 'ok')
+    posthog.capture('switch_commanded', { switch_id: switchId, state })
   } catch (err) {
     useConnectionStore.getState().report('commands', 'error', String(err))
+    posthog.captureException(err instanceof Error ? err : new Error(String(err)), { switch_id: switchId, state })
     throw err
   }
 }
@@ -134,6 +139,7 @@ export async function injectEvent(body: InjectEventRequest): Promise<{ ok: boole
 export async function cancelEvent(eventId: string): Promise<void> {
   if (MOCK_MODE) return
   await apiFetch(`/events/${eventId}`, { method: 'DELETE' })
+  posthog.capture('event_cancelled', { event_id: eventId })
 }
 
 export async function commandSignal(signalId: string, aspect: SignalAspect): Promise<void> {
@@ -145,20 +151,28 @@ export async function commandSignal(signalId: string, aspect: SignalAspect): Pro
       body: JSON.stringify({ aspect }),
     })
     useConnectionStore.getState().report('commands', 'ok')
+    posthog.capture('signal_commanded', { signal_id: signalId, aspect })
   } catch (err) {
     useConnectionStore.getState().report('commands', 'error', String(err))
+    posthog.captureException(err instanceof Error ? err : new Error(String(err)), { signal_id: signalId, aspect })
     throw err
   }
 }
 
-// ── ML training API (requires: python -m rlcbtc.cli.serve_training) ────────
+// ── ML API (requires ML service on :8001 or VITE_ML_BASE) ───────────────────
+
+export async function fetchMlHealth(): Promise<{ ok: boolean }> {
+  if (MOCK_MODE || !isMlEnabled()) return { ok: false }
+  return apiFetch<{ ok: boolean }>('/ml/health')
+}
 
 export async function fetchTrainingStatus(): Promise<TrainingStatus> {
-  if (MOCK_MODE) return { status: 'idle', running: false }
+  if (MOCK_MODE || !isMlEnabled()) return { status: 'idle', running: false }
   return withRetry(() => apiFetch<TrainingStatus>('/ml/training/status'))
 }
 
 export async function startTraining(settings: TrainingSettings): Promise<TrainingStatus> {
+  if (!isMlEnabled()) throw new Error('ML disabled (set VITE_ML_ENABLED=true and VITE_ML_BASE in production)')
   if (MOCK_MODE) {
     return { status: 'running', running: true, completed_timesteps: 0, total_timesteps: 2048 }
   }
@@ -175,18 +189,19 @@ export async function stopTraining(): Promise<TrainingStatus> {
 }
 
 export async function fetchDispatchPolicy(): Promise<DispatchPolicyInfo> {
-  if (MOCK_MODE) {
+  if (!isMlEnabled() || MOCK_MODE) {
     return { path: 'mock', exists: false, size_bytes: 0 }
   }
   return apiFetch<DispatchPolicyInfo>('/ml/dispatch/policy')
 }
 
 export async function fetchDispatchComparison(): Promise<DispatchComparison> {
-  if (MOCK_MODE) throw new Error('mock mode')
+  if (!isMlEnabled() || MOCK_MODE) throw new Error('ML disabled or mock mode')
   return apiFetch<DispatchComparison>('/ml/dispatch/comparison')
 }
 
 export async function runDispatchCompare(body?: { episodes?: number; seed?: number }): Promise<DispatchComparison> {
+  if (!isMlEnabled()) throw new Error('ML disabled (set VITE_ML_ENABLED=true and VITE_ML_BASE in production)')
   if (MOCK_MODE) {
     return {
       seed: 42,

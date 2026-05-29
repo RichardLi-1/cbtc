@@ -1,3 +1,4 @@
+import posthog from 'posthog-js';
 import { MOCK_TOPOLOGY, tickMockRuntime } from '../mock/mockData';
 import { useConnectionStore } from '../store/connectionStore';
 const BASE = import.meta.env.VITE_API_BASE || ''; // proxied by Vite dev server
@@ -12,6 +13,7 @@ export let MOCK_MODE = false;
 export function enableMockMode() {
     MOCK_MODE = true;
     useConnectionStore.getState().setMockMode(true);
+    posthog.capture('simulation_mock_mode_enabled');
 }
 export function disableMockMode() {
     MOCK_MODE = false;
@@ -90,9 +92,11 @@ export async function commandSwitch(switchId, state) {
             body: JSON.stringify({ state }),
         });
         useConnectionStore.getState().report('commands', 'ok');
+        posthog.capture('switch_commanded', { switch_id: switchId, state });
     }
     catch (err) {
         useConnectionStore.getState().report('commands', 'error', String(err));
+        posthog.captureException(err instanceof Error ? err : new Error(String(err)), { switch_id: switchId, state });
         throw err;
     }
 }
@@ -109,6 +113,7 @@ export async function cancelEvent(eventId) {
     if (MOCK_MODE)
         return;
     await apiFetch(`/events/${eventId}`, { method: 'DELETE' });
+    posthog.capture('event_cancelled', { event_id: eventId });
 }
 export async function commandSignal(signalId, aspect) {
     if (MOCK_MODE)
@@ -120,9 +125,11 @@ export async function commandSignal(signalId, aspect) {
             body: JSON.stringify({ aspect }),
         });
         useConnectionStore.getState().report('commands', 'ok');
+        posthog.capture('signal_commanded', { signal_id: signalId, aspect });
     }
     catch (err) {
         useConnectionStore.getState().report('commands', 'error', String(err));
+        posthog.captureException(err instanceof Error ? err : new Error(String(err)), { signal_id: signalId, aspect });
         throw err;
     }
 }
