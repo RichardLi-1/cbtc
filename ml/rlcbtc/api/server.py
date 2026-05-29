@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from rlcbtc.api.dispatch_service import compare_dispatch, latest_comparison, policy_info
 from rlcbtc.api.job import TrainingJob
+from rlcbtc.live.controller import get_live_controller
 
 app = FastAPI(title="rlcbtc-training-api")
 app.add_middleware(
@@ -81,5 +82,45 @@ def dispatch_compare(body: DispatchCompareBody | None = None):
     body = body or DispatchCompareBody()
     try:
         return compare_dispatch(episodes=body.episodes, seed=body.seed)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+class LiveDispatchModeBody(BaseModel):
+    mode: str = Field(description="'rule' or 'ppo'")
+
+
+class LiveDispatchActBody(BaseModel):
+    snapshot: dict
+    mode: str | None = None
+
+
+@app.get("/ml/dispatch/live/status")
+def dispatch_live_status():
+    return get_live_controller().status()
+
+
+@app.post("/ml/dispatch/live/mode")
+def dispatch_live_mode(body: LiveDispatchModeBody):
+    ctrl = get_live_controller()
+    try:
+        ctrl.set_mode(body.mode)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if body.mode == "ppo" and not ctrl.policy_ready():
+        raise HTTPException(status_code=503, detail="deployed PPO policy missing")
+    return ctrl.status()
+
+
+@app.post("/ml/dispatch/live/act")
+def dispatch_live_act(body: LiveDispatchActBody):
+    ctrl = get_live_controller()
+    if body.mode is not None:
+        try:
+            ctrl.set_mode(body.mode)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        return ctrl.act(body.snapshot)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
