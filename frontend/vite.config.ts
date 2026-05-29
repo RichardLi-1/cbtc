@@ -22,6 +22,7 @@ export default defineConfig({
       '/state': 'http://localhost:8000',
       '/commands': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
+      '/ops': 'http://localhost:8000',
       '/ml': {
         target: 'http://localhost:8001',
         timeout: 120_000,

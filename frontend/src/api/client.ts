@@ -200,6 +200,22 @@ export async function fetchDispatchComparison(): Promise<DispatchComparison> {
   return apiFetch<DispatchComparison>('/ml/dispatch/comparison')
 }
 
+export type LiveDispatchMode = 'rule' | 'ppo'
+
+export async function fetchLiveDispatchPolicy(): Promise<{ policy_mode: LiveDispatchMode; policy_ready?: boolean }> {
+  if (MOCK_MODE) return { policy_mode: 'rule', policy_ready: false }
+  return apiFetch('/ops/dispatch/policy')
+}
+
+export async function setLiveDispatchPolicy(mode: LiveDispatchMode): Promise<void> {
+  if (MOCK_MODE) return
+  await apiFetch('/ops/dispatch/policy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode }),
+  })
+}
+
 export async function runDispatchCompare(body?: { episodes?: number; seed?: number }): Promise<DispatchComparison> {
   if (!isMlEnabled()) throw new Error('ML disabled (set VITE_ML_ENABLED=true and VITE_ML_BASE in production)')
   if (MOCK_MODE) {

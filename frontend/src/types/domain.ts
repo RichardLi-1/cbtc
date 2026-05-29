@@ -111,6 +111,15 @@ export interface RuntimeState {
       next_due_in_s?: number
       blocked?: boolean
       max_trains?: number
+      target_headway_sec?: number
+      policy_mode?: 'rule' | 'ppo'
+      policy_ready?: boolean
+      headway_bias_sec?: number
+      dwell_bias_sec?: number
+      effective_headway_sec?: number
+      effective_dwell_sec?: number
+      shield_intervened?: boolean
+      ml_error?: string | null
     }
     injected_events?: InjectedEventRuntime[]
     event_log?: EventLogRow[]

@@ -173,6 +173,20 @@ export async function fetchDispatchComparison() {
         throw new Error('ML disabled or mock mode');
     return apiFetch('/ml/dispatch/comparison');
 }
+export async function fetchLiveDispatchPolicy() {
+    if (MOCK_MODE)
+        return { policy_mode: 'rule', policy_ready: false };
+    return apiFetch('/ops/dispatch/policy');
+}
+export async function setLiveDispatchPolicy(mode) {
+    if (MOCK_MODE)
+        return;
+    await apiFetch('/ops/dispatch/policy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+    });
+}
 export async function runDispatchCompare(body) {
     if (!isMlEnabled())
         throw new Error('ML disabled (set VITE_ML_ENABLED=true and VITE_ML_BASE in production)');

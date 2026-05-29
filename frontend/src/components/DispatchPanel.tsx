@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import posthog from 'posthog-js'
-import { fetchDispatchComparison, fetchDispatchPolicy, runDispatchCompare } from '../api/client'
+import {
+  fetchDispatchComparison,
+  fetchDispatchPolicy,
+  fetchLiveDispatchPolicy,
+  runDispatchCompare,
+  setLiveDispatchPolicy,
+  type LiveDispatchMode,
+} from '../api/client'
 import { useRuntimeStore } from '../store/runtimeStore'
 import type { DispatchComparison } from '../types/domain'
 import { COLORS } from '../constants/colors'
@@ -15,16 +22,26 @@ function pct(n: number | null | undefined) {
   return `${sign}${n.toFixed(1)}%`
 }
 
-type LivePolicy = 'rule' | 'ppo'
-
 export function DispatchPanel() {
   const [open, setOpen] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [policyReady, setPolicyReady] = useState<boolean | null>(null)
   const [data, setData] = useState<DispatchComparison | null>(null)
-  const [livePolicy, setLivePolicy] = useState<LivePolicy>('rule')
+  const [livePolicy, setLivePolicy] = useState<LiveDispatchMode>('rule')
+  const [policySwitchError, setPolicySwitchError] = useState<string | null>(null)
   const dispatchStatus = useRuntimeStore((s) => s.runtime?.ops?.dispatch)
+
+  const applyLivePolicy = useCallback(async (mode: LiveDispatchMode) => {
+    setPolicySwitchError(null)
+    try {
+      await setLiveDispatchPolicy(mode)
+      setLivePolicy(mode)
+      posthog.capture('dispatch_policy_switched', { policy: mode, live: true })
+    } catch (err) {
+      setPolicySwitchError(String(err))
+    }
+  }, [])
 
   const refreshPolicy = useCallback(async () => {
     try {
@@ -52,12 +69,20 @@ export function DispatchPanel() {
 
   useEffect(() => {
     void refreshPolicy()
+    void fetchLiveDispatchPolicy()
+      .then((s) => setLivePolicy(s.policy_mode === 'ppo' ? 'ppo' : 'rule'))
+      .catch(() => { /* backend may be down */ })
     void fetchDispatchComparison()
       .then(setData)
       .catch(() => {
         /* no cached comparison yet */
       })
   }, [refreshPolicy])
+
+  useEffect(() => {
+    const mode = dispatchStatus?.policy_mode
+    if (mode === 'rule' || mode === 'ppo') setLivePolicy(mode)
+  }, [dispatchStatus?.policy_mode])
 
   if (!open) {
     return (
@@ -137,24 +162,34 @@ export function DispatchPanel() {
           <span>Max: <b>{dispatchStatus?.max_trains ?? '—'}</b></span>
         </div>
 
-        {/* Live policy selector — only 'rule' is wired in the live loop today. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }}>
-          <span style={{ letterSpacing: '0.1em' }}>POLICY</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, color: COLORS.PANEL_TEXT_DIM, fontSize: 10, flexWrap: 'wrap' }}>
+          <span style={{ letterSpacing: '0.1em' }}>LIVE POLICY</span>
           <PolicyChip
             label="Rule-based"
             active={livePolicy === 'rule'}
-            onClick={() => { setLivePolicy('rule'); posthog.capture('dispatch_policy_switched', { policy: 'rule' }) }}
+            onClick={() => void applyLivePolicy('rule')}
           />
           <PolicyChip
-            label={`PPO ${policyReady === false ? '(offline)' : '(beta)'}`}
+            label={`PPO ${policyReady === false ? '(offline)' : ''}`}
             active={livePolicy === 'ppo'}
             disabled={policyReady === false}
-            onClick={() => { setLivePolicy('ppo'); posthog.capture('dispatch_policy_switched', { policy: 'ppo' }) }}
+            onClick={() => void applyLivePolicy('ppo')}
           />
-          <span style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 9 }}>
-            {livePolicy === 'ppo' ? 'switch is UI-only — live loop runs the rule policy' : ''}
-          </span>
+          {dispatchStatus?.effective_headway_sec != null && (
+            <span style={{ fontSize: 9 }}>
+              headway {Math.round(dispatchStatus.effective_headway_sec)}s
+              {dispatchStatus.shield_intervened ? ' · shield' : ''}
+            </span>
+          )}
         </div>
+        {policySwitchError && (
+          <div style={{ color: COLORS.ERROR_BANNER, fontSize: 9, marginTop: 4 }}>{policySwitchError}</div>
+        )}
+        {dispatchStatus?.ml_error && livePolicy === 'ppo' && (
+          <div style={{ color: COLORS.SIGNAL_YELLOW, fontSize: 9, marginTop: 4 }}>
+            ML fallback: {dispatchStatus.ml_error}
+          </div>
+        )}
       </div>
 
       <div style={{ color: COLORS.PANEL_TEXT_DIM, marginBottom: 8, lineHeight: 1.4, fontSize: 10 }}>
