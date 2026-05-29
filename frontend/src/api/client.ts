@@ -12,8 +12,13 @@ import { MOCK_TOPOLOGY, tickMockRuntime } from '../mock/mockData'
 import { useConnectionStore } from '../store/connectionStore'
 
 const BASE = import.meta.env.VITE_API_BASE || ''   // proxied by Vite dev server
+const ML_BASE = import.meta.env.VITE_ML_BASE || ''  // proxied by Vite dev server to :8001
 const TIMEOUT_MS = 4000
 const RETRY_DELAYS = [500, 1000, 2000]   // ms between retries
+
+function baseFor(path: string): string {
+  return path.startsWith('/ml') ? ML_BASE : BASE
+}
 
 // Set to true to skip real API calls entirely
 export let MOCK_MODE = false
@@ -33,7 +38,7 @@ async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS)
   try {
-    const res = await fetch(`${BASE}${path}`, { ...opts, signal: ctrl.signal })
+    const res = await fetch(`${baseFor(path)}${path}`, { ...opts, signal: ctrl.signal })
     if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`)
     return (await res.json()) as T
   } finally {

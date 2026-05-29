@@ -11,12 +11,15 @@ import { DispatchPanel } from './components/DispatchPanel'
 import { useUiStore } from './store/uiStore'
 import './store/eventsStore'
 import { COLORS } from './constants/colors'
+import { usePageViewTracker } from './hooks/usePageViewTracker'
 
 export default function App() {
   const { load } = useTopologyStore()
   const { startPolling, stopPolling } = useRuntimeStore()
   const [configOpen, setConfigOpen] = useState(false)
   const { infoOpen, setInfoOpen } = useUiStore()
+
+  usePageViewTracker()
 
   useEffect(() => {
     load()

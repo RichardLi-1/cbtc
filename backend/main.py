@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import commands as cmd_api
+import signal_atc
 import topology
 import train
 from events import registry as event_registry
@@ -29,7 +30,6 @@ app.add_middleware(
 )
 
 _EDGES = {e["id"]: e for e in topology.YUS_TOPOLOGY["edges"]}
-_TRAIN_ROUTE = topology.YUS_TRAIN_ROUTE
 
 
 class SwitchCommandBody(BaseModel):
@@ -232,19 +232,14 @@ def get_state():
         for sw in topology.YUS_TOPOLOGY["switches"]
     ]
 
-    signals = []
-    for sig in topology.YUS_TOPOLOGY["signals"]:
-        eid = sig["edge_id"]
-        idx = _TRAIN_ROUTE.index(eid) if eid in _TRAIN_ROUTE else -1
-        next_bid = _EDGES[_TRAIN_ROUTE[(idx + 1) % len(_TRAIN_ROUTE)]]["block_id"] if idx >= 0 else ""
-        own_bid = _EDGES.get(eid, {}).get("block_id", "")
-        computed = "red" if own_bid in occupied else ("yellow" if next_bid in occupied else "green")
-        signals.append(
-            {
-                "signal_id": sig["id"],
-                "aspect": cmd_api.signal_aspect(sig["id"], computed),
-            }
-        )
+    aspects = signal_atc.compute_aspects(occupied)
+    signals = [
+        {
+            "signal_id": sig["id"],
+            "aspect": cmd_api.signal_aspect(sig["id"], aspects.get(sig["id"], "green")),
+        }
+        for sig in topology.YUS_TOPOLOGY["signals"]
+    ]
 
     line0 = train.lines[0] if train.lines else None
     dispatch = simulation.dispatch_status(line0) if line0 is not None else None

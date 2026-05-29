@@ -18,3 +18,7 @@ __pycache__/
 
 # Editor
 /.vscode
+
+/frontend/.env
+/frontend/.env*.local
+/frontend/.vercel

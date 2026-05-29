@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import List, TYPE_CHECKING
 
+import commands as cmd_api
+import signal_atc
 from ma_constants import (
     KPH_TO_MPS,
     URBALIS_FIXED_MARGIN_M,
@@ -14,6 +16,10 @@ from route_geom import ROUTE_LEN_M, forward_distance, wrap_chainage
 
 if TYPE_CHECKING:
     from train import Train
+
+
+# Distance the train must come to rest *before* a red signal (overlap).
+SIGNAL_OVERLAP_M = 5.0
 
 
 def required_follower_gap_m(follower_speed_kph: float, leader_speed_kph: float) -> float:
@@ -37,6 +43,13 @@ class ZoneController:
         if not trains:
             return
 
+        # Signal-aware authority: derive aspects from current block occupancy,
+        # honour any operator overrides, and clamp each train's EOA to the
+        # nearest red ahead.
+        occupied = signal_atc.occupied_blocks(trains)
+        aspects = signal_atc.compute_aspects(occupied)
+        aspects = {sid: cmd_api.signal_aspect(sid, asp) for sid, asp in aspects.items()}
+
         n = len(trains)
         order = sorted(range(n), key=lambda i: wrap_chainage(trains[i].chainage_front_m, self.route_len_m))
 
@@ -50,6 +63,15 @@ class ZoneController:
             req = required_follower_gap_m(train.speed, leader.speed)
             slack = gap - req
             eoa = wrap_chainage(leader_rear - req, self.route_len_m)
+
+            red_dist = signal_atc.next_red_distance(train.chainage_front_m, aspects)
+            if red_dist is not None:
+                signal_slack = red_dist - SIGNAL_OVERLAP_M
+                if signal_slack < slack:
+                    slack = signal_slack
+                    eoa = wrap_chainage(
+                        train.chainage_front_m + signal_slack, self.route_len_m
+                    )
 
             train.leader_run_number = leader.run_number
             train.gap_to_leader_m = gap
