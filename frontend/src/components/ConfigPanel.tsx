@@ -7,6 +7,7 @@ import { useRuntimeStore } from '../store/runtimeStore'
 import { useTrainingStore } from '../store/trainingStore'
 import { COLORS } from '../constants/colors'
 import { cancelEvent, injectEvent } from '../api/client'
+import { isMlEnabled } from '../config/ml'
 import type { EventKind, RollingStockProfile } from '../types/domain'
 
 const EVENT_KINDS: EventKind[] = ['emergency_brake', 'door_fault', 'slow_speed', 'signal_fail', 'station_hold']
@@ -152,7 +153,9 @@ export function ConfigPanel({ open }: { open: boolean }) {
         ⚙ SIM CONFIG <span style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }}>(Ctrl+Shift+C)</span>
       </div>
 
-      {section('RL TRAINING')}
+      {isMlEnabled() && section('RL TRAINING')}
+      {isMlEnabled() && (
+      <>
       <Row label="Experiment">
         <select
           value={configName}
@@ -243,8 +246,10 @@ export function ConfigPanel({ open }: { open: boolean }) {
         </div>
       )}
       <div style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 9, fontFamily: 'monospace', marginBottom: 4 }}>
-        ML API starts with npm run dev (port 8001). Retrain updates ml/models/deployed/ for all users.
+        Run <code style={{ fontSize: 9 }}>npm run dev</code> (ML on :8001). Checkpoints → runs/&lt;name&gt;/latest/. Copy policy.zip to ml/models/deployed/ for everyone.
       </div>
+      </>
+      )}
 
       {section('OPERATIONS')}
       <Row label="Rolling stock %">

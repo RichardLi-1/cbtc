@@ -12,6 +12,9 @@ import { useUiStore } from './store/uiStore'
 import './store/eventsStore'
 import { COLORS } from './constants/colors'
 import { usePageViewTracker } from './hooks/usePageViewTracker'
+import { isMlEnabled } from './config/ml'
+import { fetchMlHealth } from './api/client'
+import { useConnectionStore } from './store/connectionStore'
 
 export default function App() {
   const { load } = useTopologyStore()
@@ -20,12 +23,20 @@ export default function App() {
   const { infoOpen, setInfoOpen } = useUiStore()
 
   usePageViewTracker()
+  const mlOn = isMlEnabled()
 
   useEffect(() => {
     load()
     startPolling()
     return () => stopPolling()
   }, [load, startPolling, stopPolling])
+
+  useEffect(() => {
+    if (!mlOn) return
+    void fetchMlHealth()
+      .then(() => useConnectionStore.getState().report('ml', 'ok'))
+      .catch((err) => useConnectionStore.getState().report('ml', 'error', String(err)))
+  }, [mlOn])
 
   // Ctrl+Shift+C toggles hidden config panel
   const onKeyDown = useCallback((e: KeyboardEvent) => {
@@ -47,7 +58,7 @@ export default function App() {
         <CanvasView />
       </div>
       <EventsPanel />
-      <DispatchPanel />
+      {mlOn && <DispatchPanel />}
       <ConfigPanel open={configOpen} />
       <InfoPopup open={infoOpen} onClose={() => setInfoOpen(false)} />
     </div>

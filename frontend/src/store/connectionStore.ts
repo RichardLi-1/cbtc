@@ -7,7 +7,7 @@ export interface EndpointInfo {
   error: string | null
 }
 
-export type EndpointKey = 'topology' | 'state' | 'commands'
+export type EndpointKey = 'topology' | 'state' | 'commands' | 'ml'
 
 interface ConnectionStore {
   mockMode: boolean
@@ -25,6 +25,7 @@ export const useConnectionStore = create<ConnectionStore>((set) => ({
     topology: untested,
     state: untested,
     commands: untested,
+    ml: untested,
   },
   setMockMode: (mockMode) => set({ mockMode }),
   report: (ep, health, error = null) =>
