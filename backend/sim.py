@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ato import AtoController
+from dispatch_live import live_dispatch
 from events import registry as event_registry
 from zone_controller import ZoneController
 import train
@@ -38,7 +39,8 @@ class Simulation:
         if len(line.trains) >= SPAWN_MAX_TRAINS:
             self._last_dispatch_blocked = True
             return False
-        if self._spawn_elapsed_s < SPAWN_HEADWAY_S:
+        target_hw = live_dispatch.effective_headway_sec
+        if self._spawn_elapsed_s < target_hw:
             return False
         if self._yard_occupied(line):
             self._last_dispatch_blocked = True
@@ -55,15 +57,19 @@ class Simulation:
         return True
 
     def dispatch_status(self, line: train.Line) -> dict:
-        due_in = max(0.0, SPAWN_HEADWAY_S - self._spawn_elapsed_s)
+        target_hw = live_dispatch.effective_headway_sec
+        due_in = max(0.0, target_hw - self._spawn_elapsed_s)
         blocked = self._yard_occupied(line) or len(line.trains) >= SPAWN_MAX_TRAINS
-        return {
+        out = {
             "count": self._dispatch_count,
             "last_dispatch_sim_t": self._last_dispatch_s,
             "next_due_in_s": due_in,
             "blocked": blocked,
             "max_trains": SPAWN_MAX_TRAINS,
+            "target_headway_sec": target_hw,
         }
+        out.update(live_dispatch.status_payload())
+        return out
 
     def step(self, dt: float = DT) -> None:
         self._sim_time_s += dt
@@ -74,6 +80,8 @@ class Simulation:
             for t in line.trains:
                 t.step(dt, self.route_len_m)
                 self.ato.tick_dwell(t, dt)
+            live_dispatch.tick(self, line, dt)
+            self.ato.cfg.dwell_sec = live_dispatch.effective_dwell_sec
             self._maybe_spawn(line, dt)
 
 

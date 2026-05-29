@@ -18,6 +18,7 @@ import train
 from events import registry as event_registry
 from route_geom import ROUTE_LEN_M, chainage_to_edge
 from stations import outbound_passenger_berths
+from dispatch_live import live_dispatch
 from sim import DT, simulation
 
 app = FastAPI()
@@ -38,6 +39,10 @@ class SwitchCommandBody(BaseModel):
 
 class SignalCommandBody(BaseModel):
     aspect: str
+
+
+class DispatchPolicyBody(BaseModel):
+    mode: str  # rule | ppo
 
 
 class InjectEventBody(BaseModel):
@@ -102,6 +107,22 @@ def health():
 @app.get("/topology")
 def get_topology():
     return topology.get_topology_document("YUS")
+
+
+@app.post("/ops/dispatch/policy")
+def post_dispatch_policy(body: DispatchPolicyBody):
+    try:
+        status = live_dispatch.set_mode(body.mode)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"ok": True, **status}
+
+
+@app.get("/ops/dispatch/policy")
+def get_dispatch_policy():
+    return live_dispatch.status_payload()
 
 
 @app.post("/commands/switch/{switch_id}")
