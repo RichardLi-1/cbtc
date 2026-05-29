@@ -32,6 +32,7 @@ export function renderSwitchLayer(ctx, vp, topology, runtime) {
             const normalEdge = edgesById.get(sw.normal_edge_id);
             let trackUx, trackUy;
             if (normalEdge) {
+                ;
                 ({ ux: trackUx, uy: trackUy } = edgeUnit(normalEdge));
             }
             else {

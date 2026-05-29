@@ -1,4 +1,4 @@
-// Sends a named event to /api/track, which the Cloudflare Worker forwards to
+// Sends a named event to /api/track, a Vercel Function that forwards to
 // Discord server-side. Call from any component for clicks, interactions, etc.
 //
 // Why a plain function (not a hook)? Hooks can't be called inside event
