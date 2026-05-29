@@ -6,6 +6,7 @@ export const useConnectionStore = create((set) => ({
         topology: untested,
         state: untested,
         commands: untested,
+        ml: untested,
     },
     setMockMode: (mockMode) => set({ mockMode }),
     report: (ep, health, error = null) => set((s) => ({ endpoints: { ...s.endpoints, [ep]: { health, error } } })),

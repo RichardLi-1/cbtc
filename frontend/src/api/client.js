@@ -1,4 +1,5 @@
 import posthog from 'posthog-js';
+import { isMlEnabled } from '../config/ml';
 import { MOCK_TOPOLOGY, tickMockRuntime } from '../mock/mockData';
 import { useConnectionStore } from '../store/connectionStore';
 const BASE = import.meta.env.VITE_API_BASE || ''; // proxied by Vite dev server
@@ -133,13 +134,20 @@ export async function commandSignal(signalId, aspect) {
         throw err;
     }
 }
-// ── ML training API (requires: python -m rlcbtc.cli.serve_training) ────────
+// ── ML API (requires ML service on :8001 or VITE_ML_BASE) ───────────────────
+export async function fetchMlHealth() {
+    if (MOCK_MODE || !isMlEnabled())
+        return { ok: false };
+    return apiFetch('/ml/health');
+}
 export async function fetchTrainingStatus() {
-    if (MOCK_MODE)
+    if (MOCK_MODE || !isMlEnabled())
         return { status: 'idle', running: false };
     return withRetry(() => apiFetch('/ml/training/status'));
 }
 export async function startTraining(settings) {
+    if (!isMlEnabled())
+        throw new Error('ML disabled (set VITE_ML_ENABLED=true and VITE_ML_BASE in production)');
     if (MOCK_MODE) {
         return { status: 'running', running: true, completed_timesteps: 0, total_timesteps: 2048 };
     }
@@ -155,17 +163,19 @@ export async function stopTraining() {
     return apiFetch('/ml/training/stop', { method: 'POST' });
 }
 export async function fetchDispatchPolicy() {
-    if (MOCK_MODE) {
+    if (!isMlEnabled() || MOCK_MODE) {
         return { path: 'mock', exists: false, size_bytes: 0 };
     }
     return apiFetch('/ml/dispatch/policy');
 }
 export async function fetchDispatchComparison() {
-    if (MOCK_MODE)
-        throw new Error('mock mode');
+    if (!isMlEnabled() || MOCK_MODE)
+        throw new Error('ML disabled or mock mode');
     return apiFetch('/ml/dispatch/comparison');
 }
 export async function runDispatchCompare(body) {
+    if (!isMlEnabled())
+        throw new Error('ML disabled (set VITE_ML_ENABLED=true and VITE_ML_BASE in production)');
     if (MOCK_MODE) {
         return {
             seed: 42,
