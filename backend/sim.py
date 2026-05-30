@@ -26,6 +26,9 @@ class Simulation:
         self._dispatch_count = 0
         self._last_dispatch_s: float | None = None
         self._last_dispatch_blocked = False
+        # Lifecycle control so the sim can be driven over the API.
+        self.paused = False
+        self.speed = 1.0  # wall-clock multiplier: 2.0 = twice as fast
 
     def _yard_occupied(self, line: train.Line) -> bool:
         for tr in line.trains:
