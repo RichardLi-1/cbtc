@@ -45,6 +45,11 @@ class DispatchPolicyBody(BaseModel):
     mode: str  # rule | ppo
 
 
+class SimControlBody(BaseModel):
+    action: str | None = None  # "pause" | "resume"
+    speed: float | None = None  # wall-clock multiplier, e.g. 2.0
+
+
 class InjectEventBody(BaseModel):
     kind: str
     duration_s: float = 30.0
@@ -92,8 +97,10 @@ if train.lines and train.lines[0].trains:
 
 def _sim_loop() -> None:
     while True:
-        simulation.step(DT)
-        time.sleep(DT)
+        if not simulation.paused:
+            simulation.step(DT)
+        # speed=2.0 sleeps half as long, so the sim advances twice as fast.
+        time.sleep(DT / max(simulation.speed, 0.1))
 
 
 threading.Thread(target=_sim_loop, daemon=True).start()
@@ -107,6 +114,33 @@ def health():
 @app.get("/topology")
 def get_topology():
     return topology.get_topology_document("YUS")
+
+
+@app.get("/sim")
+def get_sim():
+    """Read simulation lifecycle: paused flag, speed multiplier, sim clock."""
+    return {
+        "paused": simulation.paused,
+        "speed": simulation.speed,
+        "sim_time_s": simulation._sim_time_s,
+    }
+
+
+@app.post("/sim/control")
+def post_sim_control(body: SimControlBody):
+    """Drive the simulation: pause, resume, or change the speed multiplier."""
+    if body.action is not None:
+        if body.action == "pause":
+            simulation.paused = True
+        elif body.action == "resume":
+            simulation.paused = False
+        else:
+            raise HTTPException(status_code=400, detail="action must be 'pause' or 'resume'")
+    if body.speed is not None:
+        if body.speed <= 0:
+            raise HTTPException(status_code=400, detail="speed must be > 0")
+        simulation.speed = float(body.speed)
+    return {"ok": True, "paused": simulation.paused, "speed": simulation.speed}
 
 
 @app.post("/ops/dispatch/policy")
