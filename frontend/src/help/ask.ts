@@ -1,13 +1,10 @@
 import { HELP_TARGET_IDS, matchHelp, type HelpTargetId } from './guide'
+import { answerWhereIs, type HelpReply } from './locate'
+import { useRuntimeStore } from '../store/runtimeStore'
 
 export interface HelpMessage {
   role: 'user' | 'assistant'
   text: string
-}
-
-export interface HelpReply {
-  reply: string
-  point: HelpTargetId | null
 }
 
 function parsePoint(raw: unknown): HelpTargetId | null {
@@ -17,6 +14,7 @@ function parsePoint(raw: unknown): HelpTargetId | null {
 }
 
 export async function askHelp(question: string, history: HelpMessage[]): Promise<HelpReply> {
+  const trains = useRuntimeStore.getState().runtime?.trains ?? []
   try {
     const res = await fetch('/api/help', {
       method: 'POST',
@@ -24,6 +22,7 @@ export async function askHelp(question: string, history: HelpMessage[]): Promise
       body: JSON.stringify({
         question,
         history: history.slice(-8).map((m) => ({ role: m.role, content: m.text })),
+        trains,
       }),
     })
     if (res.ok) {
@@ -31,7 +30,7 @@ export async function askHelp(question: string, history: HelpMessage[]): Promise
       if (data.reply) return { reply: data.reply, point: parsePoint(data.point) }
     }
   } catch {
-    /* Vite has no /api/help — use the local guide. */
+    /* no /api/help */
   }
-  return matchHelp(question)
+  return answerWhereIs(question, trains) ?? matchHelp(question)
 }

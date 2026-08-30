@@ -74,7 +74,7 @@ export const HELP_TARGETS: HelpTarget[] = [
     label: 'labels',
     keywords: ['label', 'name', 'station name', 'train id'],
     answer:
-      'LABELS toggles station and train names on the map. Off = cleaner picture. On = easier to find T01 or a platform.',
+      'LABELS toggles station and train names on the map. Off = cleaner picture. On = easier to find Run 4 or a platform.',
   },
   {
     id: 'info',

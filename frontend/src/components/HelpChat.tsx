@@ -6,7 +6,7 @@ import type { HelpTargetId } from '../help/guide'
 import { useEventsStore } from '../store/eventsStore'
 import { HelpPointer } from './HelpPointer'
 
-const STARTERS = ['What is the map?', 'What are the dots?', 'How do I hold a train?', 'What is dispatch?']
+const STARTERS = ['Where is run 4?', 'What is the map?', 'How do I hold a train?', 'What is dispatch?']
 
 export function HelpChat() {
   const [open, setOpen] = useState(false)
@@ -16,7 +16,7 @@ export function HelpChat() {
   const [messages, setMessages] = useState<HelpMessage[]>([
     {
       role: 'assistant',
-      text: 'Ask what something is. I’ll explain and highlight it on the board.',
+      text: 'Ask what something is, or “where is run 4?” I’ll explain and highlight it on the board.',
     },
   ])
   const listRef = useRef<HTMLDivElement>(null)
