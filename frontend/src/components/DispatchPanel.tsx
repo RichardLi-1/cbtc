@@ -91,10 +91,19 @@ export function DispatchPanel() {
     if (mode === 'rule' || mode === 'ppo') setLivePolicy(mode)
   }, [dispatchStatus?.policy_mode])
 
+  useEffect(() => {
+    const onPoint = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === 'dispatch') setOpen(true)
+    }
+    window.addEventListener('cbtc-help-point', onPoint)
+    return () => window.removeEventListener('cbtc-help-point', onPoint)
+  }, [])
+
   if (!open) {
     return (
       <button
         type="button"
+        data-help="dispatch"
         onClick={() => setOpen(true)}
         style={{
           position: 'absolute',
@@ -122,6 +131,7 @@ export function DispatchPanel() {
 
   return (
     <div
+      data-help="dispatch"
       style={{
         position: 'absolute',
         bottom: 12,
