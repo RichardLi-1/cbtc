@@ -37,9 +37,9 @@ export function disableMockMode() {
 
 // ── Fetch helpers ──────────────────────────────────────────────────────────
 
-async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
+async function apiFetch<T>(path: string, opts?: RequestInit, timeoutMs = TIMEOUT_MS): Promise<T> {
   const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS)
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
   try {
     const res = await fetch(`${baseFor(path)}${path}`, { ...opts, signal: ctrl.signal })
     if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`)
@@ -161,9 +161,13 @@ export async function commandSignal(signalId: string, aspect: SignalAspect): Pro
 
 // ── ML API (requires ML service on :8001 or VITE_ML_BASE) ───────────────────
 
+// ML runs on Fly with auto-stop, so the first ping may hit a cold start.
+// Give it a longer timeout and retries instead of erroring on the wake-up.
+const ML_HEALTH_TIMEOUT_MS = 15000
+
 export async function fetchMlHealth(): Promise<{ ok: boolean }> {
   if (MOCK_MODE || !isMlEnabled()) return { ok: false }
-  return apiFetch<{ ok: boolean }>('/ml/health')
+  return withRetry(() => apiFetch<{ ok: boolean }>('/ml/health', undefined, ML_HEALTH_TIMEOUT_MS))
 }
 
 export async function fetchTrainingStatus(): Promise<TrainingStatus> {
