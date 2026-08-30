@@ -273,7 +273,7 @@ def get_state():
             trains_out.append(
                 {
                     "train_id": f"T{t['run_number']:02d}",
-                    "label": f"Run {t['run_number']:02d}",
+                    "label": f"Run {int(t['run_number'])}",
                     "edge_id": eid,
                     "offset": offset,
                     "speed": speed_mps,
