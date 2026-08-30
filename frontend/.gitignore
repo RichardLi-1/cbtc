@@ -1,3 +1,7 @@
 .vercel
 .env*.local
 .env
+
+# PostHog setup-wizard artifacts (generated, not source)
+.claude/skills/
+posthog-setup-report.md
