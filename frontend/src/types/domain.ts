@@ -82,7 +82,13 @@ export interface TrainPosition {
   passengers?: number
   passenger_capacity?: number
   load_pct?: number
+  /** Operator dispatch overrides (service regulation). */
+  dispatch_hold?: boolean
+  dispatch_express?: boolean
+  dispatch_skip_remaining?: number
 }
+
+export type DispatchAction = 'hold' | 'express' | 'skip' | 'release'
 
 export interface BlockRuntime {
   block_id: string

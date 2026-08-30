@@ -57,6 +57,15 @@ class AtoController:
     def target_berth(self, train: Train) -> StationBerth:
         return self.berths[train.stop_index % len(self.berths)]
 
+    def _should_skip(self, train: Train) -> bool:
+        """Operator told this train to run non-stop (express) or skip the next stop(s)."""
+        return bool(getattr(train, "_op_express", False)) or int(getattr(train, "_op_skip_remaining", 0)) > 0
+
+    def _count_skip(self, train: Train) -> None:
+        """Consume one skip as the train passes a berth; express keeps skipping forever."""
+        if not getattr(train, "_op_express", False):
+            train._op_skip_remaining = max(0, int(getattr(train, "_op_skip_remaining", 0)) - 1)
+
     def apply_commands(self, trains: list[Train]) -> None:
         for tr in trains:
             self.ensure_train_state(tr)
@@ -85,13 +94,20 @@ class AtoController:
         # Already passed this berth — dwell if we're still close (incl. v=0 case
         # where ATP stopped us just past the platform); else target the next stop.
         if ahead > self.cfg.stop_tolerance_m:
-            if v <= CREEP_SPEED_KPH and ahead <= PLATFORM_CREEP_PAST_M:
+            if not self._should_skip(train) and v <= CREEP_SPEED_KPH and ahead <= PLATFORM_CREEP_PAST_M:
                 return self._latch_dwell(train, berth)
+            if self._should_skip(train):
+                self._count_skip(train)
             train.stop_index = (train.stop_index + 1) % len(self.berths)
             berth = self.target_berth(train)
             dist, ahead = berth_approach(train.chainage_front_m, berth.chainage_m, self.route_len_m)
 
         train._ato_dist_to_berth_m = dist
+
+        # Operator express / skip: cruise straight through this berth. ATP slack
+        # (train._atp_accel_cap) still protects against the leader, so this is safe.
+        if self._should_skip(train):
+            return TrainCommand(train.direction, self.cfg.cruise_notch, e_brake=False)
 
         # Capture window — bigger floor so a train that braked early still latches.
         capture = self.cfg.stop_tolerance_m + max(v * KPH_TO_MPS * 0.4, 12.0)
@@ -122,7 +138,11 @@ class AtoController:
     def tick_dwell(self, train: Train, dt: float) -> None:
         if train.dwell_remaining_sec <= 0:
             return
-        held = getattr(train, "_station_hold", False) or getattr(train, "_door_interlock", False)
+        held = (
+            getattr(train, "_station_hold", False)
+            or getattr(train, "_door_interlock", False)
+            or getattr(train, "_op_hold", False)
+        )
         if held:
             train.dwell_remaining_sec = max(train.dwell_remaining_sec, dt)
         else:

@@ -111,6 +111,35 @@ export function renderTrainLayer(
 
     ctx.restore()
 
+    // ── Dispatch override badge ───────────────────────────────────────────
+    // Shows when Transit Control has issued a service-regulation move.
+    const badge = train.dispatch_hold
+      ? { text: 'HOLD', color: '#ffb74d' }
+      : train.dispatch_express
+        ? { text: 'EXP', color: '#4fc3f7' }
+        : (train.dispatch_skip_remaining ?? 0) > 0
+          ? { text: `SKIP×${train.dispatch_skip_remaining}`, color: '#ce93d8' }
+          : null
+    if (badge) {
+      ctx.font = 'bold 9px monospace'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      const padX = 4
+      const w = ctx.measureText(badge.text).width + padX * 2
+      const by = sy - TRAIN_H - 12
+      ctx.fillStyle = 'rgba(0,0,0,0.7)'
+      ctx.beginPath()
+      ctx.roundRect(sx - w / 2, by - 7, w, 14, 3)
+      ctx.fill()
+      ctx.strokeStyle = badge.color
+      ctx.lineWidth = 1
+      ctx.stroke()
+      ctx.fillStyle = badge.color
+      ctx.fillText(badge.text, sx, by)
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'alphabetic'
+    }
+
     // ── Label ─────────────────────────────────────────────────────────────
     if (showLabels) {
       ctx.font = 'bold 10px monospace'

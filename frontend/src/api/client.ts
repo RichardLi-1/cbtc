@@ -4,6 +4,7 @@ import type {
   RuntimeState,
   SwitchState,
   SignalAspect,
+  DispatchAction,
   TrainingStatus,
   TrainingSettings,
   DispatchComparison,
@@ -140,6 +141,23 @@ export async function cancelEvent(eventId: string): Promise<void> {
   if (MOCK_MODE) return
   await apiFetch(`/events/${eventId}`, { method: 'DELETE' })
   posthog.capture('event_cancelled', { event_id: eventId })
+}
+
+export async function commandTrain(trainId: string, action: DispatchAction, count = 1): Promise<void> {
+  if (MOCK_MODE) return
+  try {
+    await apiFetch(`/commands/train/${trainId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, count }),
+    })
+    useConnectionStore.getState().report('commands', 'ok')
+    posthog.capture('train_dispatch_commanded', { train_id: trainId, action, count })
+  } catch (err) {
+    useConnectionStore.getState().report('commands', 'error', String(err))
+    posthog.captureException(err instanceof Error ? err : new Error(String(err)), { train_id: trainId, action })
+    throw err
+  }
 }
 
 export async function commandSignal(signalId: string, aspect: SignalAspect): Promise<void> {

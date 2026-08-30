@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { RuntimeState, HoveredEntity, SimConfig, RollingStockProfile } from '../types/domain'
-import { fetchState, commandSwitch, commandSignal } from '../api/client'
+import { fetchState, commandSwitch, commandSignal, commandTrain } from '../api/client'
 
 const POLL_INTERVAL_MS = 200
 
@@ -42,6 +42,7 @@ interface RuntimeStore {
   // commands
   sendSwitchCommand: (id: string, state: import('../types/domain').SwitchState) => Promise<void>
   sendSignalCommand: (id: string, aspect: import('../types/domain').SignalAspect) => Promise<void>
+  sendTrainCommand: (id: string, action: import('../types/domain').DispatchAction, count?: number) => Promise<void>
 
   // view toggles
   toggleSafeZones: () => void
@@ -108,6 +109,15 @@ export const useRuntimeStore = create<RuntimeStore>((set) => {
         set({ commandError: null })
       } catch (err) {
         set({ commandError: `Signal ${id}: ${String(err)}` })
+      }
+    },
+
+    sendTrainCommand: async (id, action, count = 1) => {
+      try {
+        await commandTrain(id, action, count)
+        set({ commandError: null })
+      } catch (err) {
+        set({ commandError: `Train ${id}: ${String(err)}` })
       }
     },
 

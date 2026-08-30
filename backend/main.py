@@ -41,6 +41,11 @@ class SignalCommandBody(BaseModel):
     aspect: str
 
 
+class TrainDispatchBody(BaseModel):
+    action: str  # hold | express | skip | release
+    count: int = 1
+
+
 class DispatchPolicyBody(BaseModel):
     mode: str  # rule | ppo
 
@@ -212,6 +217,17 @@ def delete_event(event_id: str):
     return {"ok": True}
 
 
+@app.post("/commands/train/{train_id}")
+def post_train_command(train_id: str, body: TrainDispatchBody):
+    try:
+        cmd_api.set_train_dispatch(train_id, body.action, body.count)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "train_id": train_id, "action": body.action, "count": body.count}
+
+
 @app.post("/commands/signal/{signal_id}")
 def post_signal_command(signal_id: str, body: SignalCommandBody):
     try:
@@ -272,6 +288,9 @@ def get_state():
                     "passengers": passengers,
                     "passenger_capacity": tr_capacity,
                     "load_pct": round(load_pct, 3),
+                    "dispatch_hold": bool(t.get("op_hold")),
+                    "dispatch_express": bool(t.get("op_express")),
+                    "dispatch_skip_remaining": int(t.get("op_skip_remaining") or 0),
                 }
             )
 

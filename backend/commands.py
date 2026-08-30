@@ -5,9 +5,11 @@ from __future__ import annotations
 from typing import Literal
 
 import topology
+import train as _train_mod
 
 SwitchState = Literal["normal", "reverse"]
 SignalAspect = Literal["red", "yellow", "green"]
+DispatchAction = Literal["hold", "express", "skip", "release"]
 
 _switch_overrides: dict[str, SwitchState] = {}
 _signal_overrides: dict[str, SignalAspect] = {}
@@ -45,3 +47,49 @@ def signal_aspect(signal_id: str, computed: str) -> str:
 
 def clear_signal_override(signal_id: str) -> None:
     _signal_overrides.pop(signal_id, None)
+
+
+def _find_train(train_id: str):
+    """Resolve a 'T01'-style id to its Train instance, or None."""
+    if not train_id or not train_id.startswith("T"):
+        return None
+    try:
+        run = int(train_id[1:])
+    except ValueError:
+        return None
+    for line in _train_mod.lines:
+        for tr in line.trains:
+            if tr.run_number == run:
+                return tr
+    return None
+
+
+def set_train_dispatch(train_id: str, action: str, count: int = 1) -> None:
+    """Service-regulation moves Transit Control issues to a single train.
+
+    hold    — keep dwelling at the platform until released (close the gap behind)
+    express — run non-stop past every station until released
+    skip    — pass the next `count` stops, then resume normal stopping
+    release — clear all overrides, back to normal ATO stopping
+    """
+    tr = _find_train(train_id)
+    if tr is None:
+        raise KeyError(f"unknown train_id: {train_id!r}")
+    if action == "hold":
+        tr._op_hold = True
+        tr._op_express = False
+        tr._op_skip_remaining = 0
+    elif action == "express":
+        tr._op_express = True
+        tr._op_hold = False
+        tr._op_skip_remaining = 0
+    elif action == "skip":
+        tr._op_skip_remaining = max(1, int(count))
+        tr._op_express = False
+        tr._op_hold = False
+    elif action == "release":
+        tr._op_hold = False
+        tr._op_express = False
+        tr._op_skip_remaining = 0
+    else:
+        raise ValueError(f"invalid dispatch action: {action!r}")

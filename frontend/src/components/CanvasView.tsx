@@ -9,7 +9,7 @@ import { renderTrainLayer } from '../render/layers/TrainLayer'
 import { renderLabelLayer } from '../render/layers/LabelLayer'
 import { COLORS } from '../constants/colors'
 import { interpolatePolyline, hitTestPoint } from '../utils/geometry'
-import type { HoveredEntity, Topology, RuntimeState } from '../types/domain'
+import type { HoveredEntity, Topology, RuntimeState, DispatchAction } from '../types/domain'
 import { Tooltip } from './Tooltip'
 
 // Shared viewport instance — lives outside React so the rAF loop can close over it
@@ -65,9 +65,10 @@ export function CanvasView() {
   const touchMoved = useRef(false)
 
   const [hovered, setHovered] = useState<HoveredEntity | null>(null)
+  const [trainMenu, setTrainMenu] = useState<{ id: string; x: number; y: number } | null>(null)
 
   const { topology } = useTopologyStore()
-  const { setHovered: storeSetHovered, sendSwitchCommand, sendSignalCommand } = useRuntimeStore()
+  const { setHovered: storeSetHovered, sendSwitchCommand, sendSignalCommand, sendTrainCommand } = useRuntimeStore()
 
   // Fit viewport when topology first loads
   useEffect(() => {
@@ -157,6 +158,7 @@ export function CanvasView() {
     if (e.button !== 0) return
     dragging.current = true
     lastMouse.current = { x: e.clientX, y: e.clientY }
+    setTrainMenu(null)
   }, [])
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
@@ -202,7 +204,11 @@ export function CanvasView() {
     const sx = e.clientX - rect.left
     const sy = e.clientY - rect.top
     const hit = hitTest(sx, sy, topo, rt)
-    if (!hit) return
+    if (!hit) { setTrainMenu(null); return }
+
+    if (hit.kind === 'train') {
+      setTrainMenu({ id: hit.id, x: sx, y: sy })
+    }
 
     if (hit.kind === 'switch') {
       const current = rt.switches.find(s => s.switch_id === hit.id)?.state ?? 'normal'
@@ -289,6 +295,75 @@ export function CanvasView() {
       {hovered && topoForTooltip && rtForTooltip && (
         <Tooltip hovered={hovered} topology={topoForTooltip} runtime={rtForTooltip} />
       )}
+      {trainMenu && (
+        <TrainDispatchMenu
+          trainId={trainMenu.id}
+          x={trainMenu.x}
+          y={trainMenu.y}
+          onAction={(action, count) => { sendTrainCommand(trainMenu.id, action, count); setTrainMenu(null) }}
+          onClose={() => setTrainMenu(null)}
+        />
+      )}
     </>
+  )
+}
+
+function TrainDispatchMenu({
+  trainId, x, y, onAction, onClose,
+}: {
+  trainId: string
+  x: number
+  y: number
+  onAction: (action: DispatchAction, count?: number) => void
+  onClose: () => void
+}) {
+  const train = useRuntimeStore((s) => s.runtime?.trains.find((t) => t.train_id === trainId))
+  const active = train?.dispatch_hold
+    ? 'HOLD at platform'
+    : train?.dispatch_express
+      ? 'EXPRESS (non-stop)'
+      : (train?.dispatch_skip_remaining ?? 0) > 0
+        ? `SKIP next ${train?.dispatch_skip_remaining}`
+        : 'normal'
+
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        position: 'absolute', left: Math.min(x + 12, window.innerWidth - 200), top: y + 12, zIndex: 120,
+        background: COLORS.PANEL_BG, border: `1px solid ${COLORS.PANEL_BORDER}`,
+        borderRadius: 4, padding: 8, width: 184,
+        fontFamily: 'monospace', fontSize: 11, color: COLORS.PANEL_TEXT,
+        boxShadow: '0 6px 20px rgba(0,0,0,0.55)',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+        <span style={{ letterSpacing: '0.08em' }}>DISPATCH · {trainId}</span>
+        <span onClick={onClose} style={{ cursor: 'pointer', color: COLORS.PANEL_TEXT_DIM }} title="Close">✕</span>
+      </div>
+      <div style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10, marginBottom: 8 }}>state: {active}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <MenuBtn label="Hold at platform" hint="close the gap behind" onClick={() => onAction('hold')} />
+        <MenuBtn label="Express (non-stop)" hint="skip every stop" onClick={() => onAction('express')} />
+        <MenuBtn label="Skip next stop" hint="pass 1, then resume" onClick={() => onAction('skip', 1)} />
+        <MenuBtn label="Resume normal" hint="clear overrides" onClick={() => onAction('release')} />
+      </div>
+    </div>
+  )
+}
+
+function MenuBtn({ label, hint, onClick }: { label: string; hint: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        textAlign: 'left', background: COLORS.BUTTON_BG, color: COLORS.PANEL_TEXT,
+        border: `1px solid ${COLORS.PANEL_BORDER}`, borderRadius: 3, padding: '5px 8px',
+        fontFamily: 'monospace', fontSize: 11, cursor: 'pointer', lineHeight: 1.25,
+      }}
+    >
+      <div>{label}</div>
+      <div style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 9 }}>{hint}</div>
+    </button>
   )
 }

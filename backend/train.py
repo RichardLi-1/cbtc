@@ -214,6 +214,9 @@ def getState() -> str:
                     "dwell_remaining_sec": train.dwell_remaining_sec,
                     "at_station_name": train.at_station_name,
                     "stop_index": train.stop_index,
+                    "op_hold": train._op_hold,
+                    "op_express": train._op_express,
+                    "op_skip_remaining": train._op_skip_remaining,
                 }
                 for train in line.trains
             ],
