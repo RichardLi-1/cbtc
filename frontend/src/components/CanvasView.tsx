@@ -220,8 +220,9 @@ export function CanvasView() {
 
     if (hit.kind === 'signal') {
       const current = rt.signals.find(s => s.signal_id === hit.id)?.aspect ?? 'green'
-      const aspects = ['green', 'yellow', 'red', 'dark'] as const
-      const next = aspects[(aspects.indexOf(current as typeof aspects[number]) + 1) % aspects.length]
+      const aspects = ['green', 'yellow', 'red'] as const
+      const i = aspects.indexOf(current as typeof aspects[number])
+      const next = aspects[i < 0 ? 0 : (i + 1) % aspects.length]
       sendSignalCommand(hit.id, next)
     }
   }, [sendSwitchCommand, sendSignalCommand])
@@ -338,7 +339,7 @@ function TrainDispatchMenu({
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-        <span style={{ letterSpacing: '0.08em' }}>DISPATCH · {trainId}</span>
+        <span style={{ letterSpacing: '0.08em' }}>DISPATCH · {train?.label ?? trainId}</span>
         <span onClick={onClose} style={{ cursor: 'pointer', color: COLORS.PANEL_TEXT_DIM }} title="Close">✕</span>
       </div>
       <div style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10, marginBottom: 8 }}>state: {active}</div>
