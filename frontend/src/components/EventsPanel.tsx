@@ -264,7 +264,10 @@ function InjectPane() {
         <Row label={targetLabel[kind]}>
           <select value={target} onChange={(e) => setTarget(e.target.value)} style={selectStyle}>
             <option value="">— select —</option>
-            {targetOptions.map((id) => <option key={id} value={id}>{id}</option>)}
+            {targetOptions.map((id) => {
+              const name = runtime?.trains.find((t) => t.train_id === id)?.label ?? id
+              return <option key={id} value={id}>{name}</option>
+            })}
           </select>
         </Row>
       )}

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { useRuntimeStore } from './runtimeStore'
-import type { RuntimeState } from '../types/domain'
+import type { RuntimeState, TrainState } from '../types/domain'
 
 export type EventSeverity = 'info' | 'warn' | 'error'
 export type EventSource = 'system' | 'wayside' | 'driver' | 'manual'
@@ -65,6 +65,26 @@ export const useEventsStore = create<EventsStore>((set, get) => ({
   setPanelOpen: (v) => set({ panelOpen: v }),
   setInjectOpen: (v) => set({ injectOpen: v }),
 }))
+
+function trainMoveLine(name: string, from: TrainState, to: TrainState, station?: string | null): string {
+  const at = station?.trim()
+  if (to === 'dwelling' || (from === 'arriving' && to === 'running' && at)) {
+    return at ? `${name} arrived and stopped at ${at}` : `${name} arrived and stopped`
+  }
+  if (from === 'dwelling' && to === 'running') {
+    return at ? `${name} left ${at}` : `${name} left the station`
+  }
+  if (from === 'running' && to === 'arriving') {
+    return at ? `${name} approaching ${at}` : `${name} approaching the next station`
+  }
+  if (from === 'dwelling' && to === 'arriving') {
+    return at ? `${name} left ${at}` : `${name} left the station`
+  }
+  if (from === 'arriving' && to === 'running') {
+    return `${name} back underway`
+  }
+  return `${name} underway`
+}
 
 // ── Auto-derive events from runtime state changes ──────────────────────────
 
@@ -179,10 +199,12 @@ useRuntimeStore.subscribe((state) => {
   const prevIds = new Set(_prev.trains.map((t) => t.train_id))
   const curIds = new Set(cur.trains.map((t) => t.train_id))
   for (const id of curIds) if (!prevIds.has(id)) {
-    append({ source: 'wayside', severity: 'info', kind: 'TRAIN', message: `${id} entered service` })
+    const name = cur.trains.find((t) => t.train_id === id)?.label ?? id
+    append({ source: 'wayside', severity: 'info', kind: 'TRAIN', message: `${name} entered service` })
   }
   for (const id of prevIds) if (!curIds.has(id)) {
-    append({ source: 'wayside', severity: 'warn', kind: 'TRAIN', message: `${id} left service` })
+    const name = _prev.trains.find((t) => t.train_id === id)?.label ?? id
+    append({ source: 'wayside', severity: 'warn', kind: 'TRAIN', message: `${name} left service` })
   }
 
   // Train state changes (running ↔ dwelling ↔ arriving)
@@ -190,10 +212,9 @@ useRuntimeStore.subscribe((state) => {
   for (const t of cur.trains) {
     const p = prevTrains.get(t.train_id)
     if (p && p.state !== t.state) {
-      const at = t.station_name ? ` @ ${t.station_name}` : ''
       append({
         source: 'wayside', severity: 'info', kind: 'TRAIN',
-        message: `${t.train_id} ${p.state} → ${t.state}${at}`,
+        message: trainMoveLine(t.label, p.state, t.state, t.station_name || p.station_name),
       })
     }
     // Skip a second DWELL line — the TRAIN state change already says it.
@@ -202,17 +223,17 @@ useRuntimeStore.subscribe((state) => {
       if (p.atp_slack_m >= 0 && t.atp_slack_m < 0) {
         append({
           source: 'wayside', severity: 'error', kind: 'ATP',
-          message: `${t.train_id} authority breached — slack ${t.atp_slack_m.toFixed(1)} m`,
+          message: `${t.label} authority breached — slack ${t.atp_slack_m.toFixed(1)} m`,
         })
       } else if (p.atp_slack_m < 0 && t.atp_slack_m >= 0) {
         append({
           source: 'wayside', severity: 'info', kind: 'ATP',
-          message: `${t.train_id} authority recovered`,
+          message: `${t.label} authority recovered`,
         })
       } else if (p.atp_slack_m >= 15 && t.atp_slack_m < 15) {
         append({
           source: 'wayside', severity: 'warn', kind: 'ATP',
-          message: `${t.train_id} slack tightening — ${t.atp_slack_m.toFixed(1)} m`,
+          message: `${t.label} slack tightening — ${t.atp_slack_m.toFixed(1)} m`,
         })
       }
     }
