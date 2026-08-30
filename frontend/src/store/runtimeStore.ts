@@ -52,7 +52,17 @@ interface RuntimeStore {
   updateConfig: (patch: Partial<SimConfig>) => void
 }
 
-export const useRuntimeStore = create<RuntimeStore>((set) => {
+function acceptState(prev: RuntimeState | null, next: RuntimeState): boolean {
+  const a = prev?.sim_time_s
+  const b = next.sim_time_s
+  if (a == null || b == null || !Number.isFinite(a) || !Number.isFinite(b)) return true
+  if (b + 0.25 >= a) return true
+  // Real reset (sim restarted), not a second replica.
+  if (b < 15 && a > 30) return true
+  return false
+}
+
+export const useRuntimeStore = create<RuntimeStore>((set, get) => {
   let _pollTimer: ReturnType<typeof setInterval> | null = null
   let _staleTimer: ReturnType<typeof setTimeout> | null = null
   const STALE_AFTER_MS = 2000
@@ -76,6 +86,7 @@ export const useRuntimeStore = create<RuntimeStore>((set) => {
       const poll = async () => {
         try {
           const runtime = await fetchState()
+          if (!acceptState(get().runtime, runtime)) return
           set({ runtime, stale: false })
           resetStaleTimer()
         } catch {
