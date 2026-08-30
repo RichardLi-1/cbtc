@@ -91,8 +91,16 @@ function EndpointDot({ ep, label }: { ep: EndpointKey; label: string }) {
 export function ControlPanel() {
   const { runtime, stale, commandError, showSafeZones, showLabels, clearCommandError, toggleSafeZones, toggleLabels } =
     useRuntimeStore()
-  const { mockMode } = useConnectionStore()
+  const { mockMode, endpoints } = useConnectionStore()
   const setInfoOpen = useUiStore((s) => s.setInfoOpen)
+  const devMode = useUiStore((s) => s.devMode)
+  const statusEps: { ep: EndpointKey; label: string }[] = [
+    { ep: 'topology', label: '/topology' },
+    { ep: 'state', label: '/state' },
+    { ep: 'commands', label: '/commands' },
+    ...(isMlEnabled() ? [{ ep: 'ml' as const, label: '/ml' }] : []),
+  ]
+  const visibleStatus = statusEps.filter(({ ep }) => devMode || endpoints[ep].health === 'error')
 
   const simClock = formatSimClock(runtime?.sim_time_s)
   const now = useWallClock()
@@ -100,6 +108,7 @@ export function ControlPanel() {
 
   return (
     <div
+      data-help="header"
       style={{
         position: 'absolute',
         top: 0,
@@ -143,11 +152,16 @@ export function ControlPanel() {
         SIM {simClock}
       </span>
 
-      {/* Endpoint health dots */}
-      <EndpointDot ep="topology" label="/topology" />
-      <EndpointDot ep="state" label="/state" />
-      <EndpointDot ep="commands" label="/commands" />
-      {isMlEnabled() && <EndpointDot ep="ml" label="/ml" />}
+      {visibleStatus.length > 0 && (
+        <span data-help="status" style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+          {devMode && (
+            <span style={{ color: COLORS.PANEL_TEXT_DIM, fontFamily: 'monospace', fontSize: 10 }}>DEV</span>
+          )}
+          {visibleStatus.map(({ ep, label }) => (
+            <EndpointDot key={ep} ep={ep} label={label} />
+          ))}
+        </span>
+      )}
 
       {/* Mock badge */}
       {mockMode && (
@@ -181,25 +195,35 @@ export function ControlPanel() {
         target="_blank"
         rel="noopener noreferrer"
         title="View source on GitHub"
+        aria-label="GitHub"
         style={{
           background: COLORS.BUTTON_BG,
           color: COLORS.PANEL_TEXT,
           border: `1px solid ${COLORS.PANEL_BORDER}`,
           borderRadius: 3,
-          padding: '3px 10px',
-          fontSize: 11,
-          fontFamily: 'monospace',
-          letterSpacing: '0.03em',
+          padding: '3px 6px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          lineHeight: 0,
           textDecoration: 'none',
         }}
       >
-        GITHUB
+        {/* Same mark hi-sg uses (lucide Github) — no image file in that repo. */}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
+          <path d="M9 18c-4.51 2-5-2-7-2" />
+        </svg>
       </a>
 
-      <Btn label="INFO" onClick={() => { setInfoOpen(true); posthog.capture('info_panel_viewed') }} />
-      <Btn label={showSafeZones ? 'SAFE ZONES ●' : 'SAFE ZONES ○'} active={showSafeZones} onClick={toggleSafeZones} />
-      <Btn label={showLabels ? 'LABELS ●' : 'LABELS ○'} active={showLabels} onClick={toggleLabels} />
-
+      <span data-help="info">
+        <Btn label="INFO" onClick={() => { setInfoOpen(true); posthog.capture('info_panel_viewed') }} />
+      </span>
+      <span data-help="safe-zones">
+        <Btn label={showSafeZones ? 'SAFE ZONES ●' : 'SAFE ZONES ○'} active={showSafeZones} onClick={toggleSafeZones} />
+      </span>
+      <span data-help="labels">
+        <Btn label={showLabels ? 'LABELS ●' : 'LABELS ○'} active={showLabels} onClick={toggleLabels} />
+      </span>
       {/* Train count */}
       <span style={{ color: COLORS.PANEL_TEXT_DIM, fontFamily: 'monospace', fontSize: 11 }}>
         {runtime?.trains?.length ?? 0} trains

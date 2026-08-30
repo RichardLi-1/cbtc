@@ -6,6 +6,7 @@ import { ControlPanel } from './components/ControlPanel'
 import { ConfigPanel } from './components/ConfigPanel'
 import { BackendNotice } from './components/BackendNotice'
 import { InfoPopup } from './components/InfoPopup'
+import { HelpChat } from './components/HelpChat'
 import { EventsPanel } from './components/EventsPanel'
 import { DispatchPanel } from './components/DispatchPanel'
 import { useUiStore } from './store/uiStore'
@@ -20,7 +21,7 @@ export default function App() {
   const { load } = useTopologyStore()
   const { startPolling, stopPolling } = useRuntimeStore()
   const [configOpen, setConfigOpen] = useState(false)
-  const { infoOpen, setInfoOpen } = useUiStore()
+  const { infoOpen, setInfoOpen, toggleDevMode } = useUiStore()
 
   usePageViewTracker()
   const mlOn = isMlEnabled()
@@ -38,13 +39,17 @@ export default function App() {
       .catch((err) => useConnectionStore.getState().report('ml', 'error', String(err)))
   }, [mlOn])
 
-  // Ctrl+Shift+C toggles hidden config panel
+  // Ctrl+Shift+C = hidden config. Ctrl+Shift+D = endpoint dots (dev mode).
   const onKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.ctrlKey && e.shiftKey && e.key === 'C') {
       e.preventDefault()
       setConfigOpen(v => !v)
     }
-  }, [])
+    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+      e.preventDefault()
+      toggleDevMode()
+    }
+  }, [toggleDevMode])
   useEffect(() => {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -54,12 +59,13 @@ export default function App() {
     <div style={{ position: 'relative', width: '100vw', height: '100vh', background: COLORS.BACKGROUND, overflow: 'hidden' }}>
       <ControlPanel />
       <BackendNotice />
-      <div style={{ position: 'absolute', top: 38, left: 0, right: 0, bottom: 0 }}>
+      <div data-help="map" style={{ position: 'absolute', top: 38, left: 0, right: 0, bottom: 0 }}>
         <CanvasView />
       </div>
       <EventsPanel />
       {mlOn && <DispatchPanel />}
       <ConfigPanel open={configOpen} />
+      <HelpChat />
       <InfoPopup open={infoOpen} onClose={() => setInfoOpen(false)} />
     </div>
   )

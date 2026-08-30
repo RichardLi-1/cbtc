@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useRuntimeStore } from '../store/runtimeStore'
+import { useUiStore } from '../store/uiStore'
 import { useTrainingStore } from '../store/trainingStore'
 import { COLORS } from '../constants/colors'
 import { cancelEvent, injectEvent } from '../api/client'
@@ -48,6 +49,7 @@ const TRAINING_CONFIGS = ['ppo_smoke.yaml', 'ppo_baseline.yaml', 'rule_based_smo
 
 export function ConfigPanel({ open }: { open: boolean }) {
   const { config, runtime, updateConfig } = useRuntimeStore()
+  const { devMode, setDevMode } = useUiStore()
   const {
     persistCheckpoints,
     resumeTraining,
@@ -152,6 +154,26 @@ export function ConfigPanel({ open }: { open: boolean }) {
       <div style={{ color: COLORS.PANEL_TEXT, fontFamily: 'monospace', fontSize: 13, marginBottom: 12 }}>
         ⚙ SIM CONFIG <span style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }}>(Ctrl+Shift+C)</span>
       </div>
+
+      <Row label="Dev mode">
+        <button
+          type="button"
+          onClick={() => setDevMode(!devMode)}
+          style={{
+            background: devMode ? COLORS.BUTTON_ACTIVE : COLORS.BUTTON_BG,
+            color: COLORS.PANEL_TEXT,
+            border: `1px solid ${COLORS.PANEL_BORDER}`,
+            borderRadius: 3,
+            padding: '2px 8px',
+            fontFamily: 'monospace',
+            fontSize: 11,
+            cursor: 'pointer',
+          }}
+        >
+          {devMode ? 'ON' : 'OFF'}
+        </button>
+        <span style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }}>Ctrl+Shift+D — show API dots</span>
+      </Row>
 
       {isMlEnabled() && section('RL TRAINING')}
       {isMlEnabled() && (
