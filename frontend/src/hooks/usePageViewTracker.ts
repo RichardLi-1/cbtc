@@ -30,7 +30,11 @@ export function usePageViewTracker() {
     if (localStorage.getItem('skip_tracking')) return
 
     const ua = navigator.userAgent
-    const isBot = /bot|crawler|spider/i.test(ua)
+    // navigator.webdriver is true when the page is driven by automation
+    // (Selenium/Puppeteer/Playwright). Real browsers report false/undefined.
+    // 📖 https://developer.mozilla.org/en-US/docs/Web/API/Navigator/webdriver
+    const isWebdriver = navigator.webdriver === true
+    const isBot = /bot|crawler|spider|headless/i.test(ua) || isWebdriver
     const isMobile = /Mobi|Android|iPhone|iPad/i.test(ua)
     const deviceType = isMobile ? '📱 Mobile' : '🖥️ Desktop'
     const platform = /iPhone|iPad/.test(ua) ? 'iOS'
@@ -77,8 +81,16 @@ export function usePageViewTracker() {
     trackEvent(eventLabel, {
       '🖥️ Device': `${deviceType} · ${platform}`,
       '🕒 Time': new Date().toLocaleString(),
+      // document.referrer = the page that linked here ("" if typed/bookmarked
+      // or the referrer was stripped). The single best signal for "where did
+      // this visitor actually come from".
+      '↩️ Referrer': document.referrer || '(none)',
+      '🌐 Lang': navigator.languages?.join(', ') || navigator.language || 'unknown',
+      '🖼️ Screen': `${screen.width}x${screen.height}`,
+      '⚙️ Cores': String(navigator.hardwareConcurrency ?? '?'),
+      '🔍 UA': ua,
+      ...(isWebdriver ? { '🚨 Automation': 'navigator.webdriver = true' } : {}),
       ...(rawParams ? { '🔗 Params': `?${rawParams}` } : {}),
-      ...(isBot ? { '🔍 UA': ua } : {}),
     })
   }, [])
 }
