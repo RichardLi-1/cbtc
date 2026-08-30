@@ -120,43 +120,51 @@ export function renderTrainLayer(
         : (train.dispatch_skip_remaining ?? 0) > 0
           ? { text: `SKIP×${train.dispatch_skip_remaining}`, color: '#ce93d8' }
           : null
+    // Left of travel — IB and OB run opposite ways, so names sit outside the pair.
+    const leftX = -Math.sin(angle)
+    const leftY = Math.cos(angle)
+    const nameOff = TRAIN_H + 14
+    const nx = sx + leftX * nameOff
+    const ny = sy + leftY * nameOff
+
     if (badge) {
       ctx.font = 'bold 9px monospace'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       const padX = 4
       const w = ctx.measureText(badge.text).width + padX * 2
-      const by = sy - TRAIN_H - 12
+      const bx = nx + leftX * 14
+      const by = ny + leftY * 14
       ctx.fillStyle = 'rgba(0,0,0,0.7)'
       ctx.beginPath()
-      ctx.roundRect(sx - w / 2, by - 7, w, 14, 3)
+      ctx.roundRect(bx - w / 2, by - 7, w, 14, 3)
       ctx.fill()
       ctx.strokeStyle = badge.color
       ctx.lineWidth = 1
       ctx.stroke()
       ctx.fillStyle = badge.color
-      ctx.fillText(badge.text, sx, by)
+      ctx.fillText(badge.text, bx, by)
       ctx.textAlign = 'left'
       ctx.textBaseline = 'alphabetic'
     }
 
-    // ── Label ─────────────────────────────────────────────────────────────
+    // ── Label (beside the car, not on the rail) ───────────────────────────
     if (showLabels) {
       ctx.font = 'bold 10px monospace'
       ctx.fillStyle = COLORS.TRAIN_ID_LABEL
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillText(train.label, sx, sy)
+      ctx.fillText(train.label, nx, ny)
 
       if (vp.camera.zoom > 3) {
         ctx.font = '8px monospace'
         ctx.fillStyle = COLORS.HUD
         const kmh = (train.speed * 3.6).toFixed(0)
-        ctx.fillText(`${kmh} km/h`, sx, sy + TRAIN_H + 10)
+        ctx.fillText(`${kmh} km/h`, nx + leftX * 12, ny + leftY * 12)
 
         if (tier !== 'nominal' && train.atp_slack_m != null) {
           ctx.fillStyle = tier === 'danger' ? '#ff5252' : '#ffb74d'
-          ctx.fillText(`Δ ${train.atp_slack_m.toFixed(0)} m`, sx, sy + TRAIN_H + 20)
+          ctx.fillText(`Δ ${train.atp_slack_m.toFixed(0)} m`, nx + leftX * 22, ny + leftY * 22)
         }
       }
       ctx.textAlign = 'left'

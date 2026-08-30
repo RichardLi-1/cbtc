@@ -2,8 +2,6 @@ import type { Topology, TopologyNode } from '../../types/domain'
 import type { Viewport } from '../Viewport'
 import { COLORS } from '../../constants/colors'
 
-const OB_LABEL_OFFSET = -28   // screen px above outbound track
-
 // Pair each ob_<i> with its matching ib_<i> sibling so we can draw a single
 // platform that straddles both tracks instead of a separate marker per leg.
 function siblingNode(node: TopologyNode, topology: Topology): TopologyNode | null {
@@ -68,17 +66,34 @@ export function renderLabelLayer(
 
     if (!showLabels) continue
 
-    // Label above the platform (screen-aligned text)
+    // Push the name off the rails: from the outbound track, keep going
+    // across the pair so the box sits beside the line, not on it.
+    // (A fixed "up the screen" offset lands ON a north–south track.)
+    const [osx, osy] = vp.worldToScreen(node.x, node.y)
+    let vx = osx - scx
+    let vy = osy - scy
+    const vL = Math.hypot(vx, vy)
+    if (vL > 0.5) {
+      vx /= vL
+      vy /= vL
+    } else {
+      vx = -Math.sin(angle)
+      vy = Math.cos(angle)
+    }
+    const gap = halfWidPx + fontPx + 14
+    const lsx = osx + vx * gap
+    const lsy = osy + vy * gap
+
     ctx.font = `bold ${fontPx}px monospace`
     ctx.textAlign = 'center'
-    ctx.textBaseline = 'bottom'
+    ctx.textBaseline = 'middle'
     const label = node.label
     const textW = ctx.measureText(label).width
     const padX = 5
-    const lh = Math.ceil(fontPx + 5)
+    const lh = Math.ceil(fontPx + 6)
     const lw = Math.ceil(textW + padX * 2)
-    const lx = Math.round(scx - lw / 2)
-    const ly = Math.round(scy + OB_LABEL_OFFSET - lh + 2)
+    const lx = Math.round(lsx - lw / 2)
+    const ly = Math.round(lsy - lh / 2)
 
     ctx.fillStyle = COLORS.STATION_LABEL_BG ?? 'rgba(8, 14, 22, 0.85)'
     ctx.fillRect(lx, ly, lw, lh)
@@ -87,7 +102,7 @@ export function renderLabelLayer(
     ctx.strokeRect(lx, ly, lw, lh)
 
     ctx.fillStyle = COLORS.STATION_LABEL ?? '#cde6ff'
-    ctx.fillText(label, scx, scy + OB_LABEL_OFFSET)
+    ctx.fillText(label, lsx, lsy)
   }
 
   ctx.textAlign = 'left'
