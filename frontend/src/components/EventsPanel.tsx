@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import posthog from 'posthog-js'
-import { useEventsStore, type EventSeverity, type EventSource, type SimEvent } from '../store/eventsStore'
+import { useEventsStore, type EventSeverity, type SimEvent } from '../store/eventsStore'
 import { useRuntimeStore } from '../store/runtimeStore'
 import { useTopologyStore } from '../store/topologyStore'
 import { injectEvent } from '../api/client'
