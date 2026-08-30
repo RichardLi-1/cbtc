@@ -12,13 +12,6 @@ const SEV_COLOR: Record<EventSeverity, string> = {
   error: COLORS.SIGNAL_RED,
 }
 
-const SRC_COLOR: Record<EventSource, string> = {
-  system: COLORS.PANEL_TEXT_DIM,
-  wayside: '#4fc3f7',
-  driver: '#ce93d8',
-  manual: '#ffb74d',
-}
-
 const SERVICE_START_SEC = 6 * 3600
 
 function fmtSimT(t: number | null) {
@@ -35,13 +28,18 @@ const PANEL_WIDTH = 340
 const HEADER_H = 38
 
 export function EventsPanel() {
-  const { events, paused, panelOpen, injectOpen, togglePaused, clear, setPanelOpen, setInjectOpen } = useEventsStore()
+  const { events, paused, panelOpen, injectOpen, showSignals, togglePaused, toggleShowSignals, clear, setPanelOpen, setInjectOpen } = useEventsStore()
   const runtime = useRuntimeStore((s) => s.runtime)
   const dispatch = runtime?.ops?.dispatch
+  const visible = useMemo(
+    () => (showSignals ? events : events.filter((e) => e.kind !== 'SIG')),
+    [events, showSignals],
+  )
 
   if (!panelOpen) {
     return (
       <div
+        data-help="events"
         onClick={() => setPanelOpen(true)}
         style={{
           position: 'absolute', top: HEADER_H + 8, right: 8, zIndex: 60,
@@ -51,13 +49,14 @@ export function EventsPanel() {
         }}
         title="Open events panel"
       >
-        EVENTS ◀ {events.length > 0 && <span style={{ color: COLORS.PANEL_TEXT_DIM }}>({events.length})</span>}
+        EVENTS ◀ {visible.length > 0 && <span style={{ color: COLORS.PANEL_TEXT_DIM }}>({visible.length})</span>}
       </div>
     )
   }
 
   return (
     <div
+      data-help="events"
       style={{
         position: 'absolute', top: HEADER_H, right: 0, bottom: 0, width: PANEL_WIDTH, maxWidth: '100vw', zIndex: 60,
         background: COLORS.PANEL_BG, borderLeft: `1px solid ${COLORS.PANEL_BORDER}`,
@@ -71,7 +70,8 @@ export function EventsPanel() {
         display: 'flex', alignItems: 'center', gap: 6,
       }}>
         <span style={{ letterSpacing: '0.1em', flex: 1 }}>EVENTS</span>
-        <span style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }}>{events.length}</span>
+        <span style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }}>{visible.length}</span>
+        <MiniBtn label={showSignals ? 'SIG ●' : 'SIG ○'} onClick={toggleShowSignals} active={showSignals} title="Show routine signal flips" />
         <MiniBtn label={paused ? 'RESUME' : 'PAUSE'} onClick={togglePaused} active={paused} />
         <MiniBtn label="CLEAR" onClick={clear} />
         <MiniBtn label="✕" onClick={() => setPanelOpen(false)} title="Hide panel" />
@@ -87,6 +87,7 @@ export function EventsPanel() {
 
       {/* Inject toggle */}
       <div
+        data-help="inject"
         onClick={() => setInjectOpen(!injectOpen)}
         style={{
           padding: '6px 10px', borderBottom: `1px solid ${COLORS.PANEL_BORDER}`,
@@ -102,12 +103,14 @@ export function EventsPanel() {
 
       {/* Event list */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {events.length === 0 && (
+        {visible.length === 0 && (
           <div style={{ padding: 14, color: COLORS.PANEL_TEXT_DIM, fontSize: 11 }}>
-            no events yet — system idle.
+            {events.length === 0
+              ? 'no events yet — system idle.'
+              : 'only signal noise so far — turn on SIG to see it.'}
           </div>
         )}
-        {events.map((e) => <EventRow key={e.id} e={e} />)}
+        {visible.map((e) => <EventRow key={e.id} e={e} />)}
       </div>
     </div>
   )
@@ -117,14 +120,13 @@ function EventRow({ e }: { e: SimEvent }) {
   const planned = e.kind === 'PLAN'
   return (
     <div style={{
-      padding: '4px 10px', borderBottom: `1px solid #0d1620`,
-      display: 'grid', gridTemplateColumns: '64px 38px 36px 1fr', gap: 6, alignItems: 'baseline',
-      fontSize: 11, lineHeight: 1.35,
+      padding: '5px 10px', borderBottom: `1px solid #0d1620`,
+      display: 'grid', gridTemplateColumns: '64px 44px 1fr', gap: 8, alignItems: 'baseline',
+      fontSize: 11, lineHeight: 1.4,
       opacity: planned ? 0.85 : 1,
       fontStyle: planned ? 'italic' : 'normal',
     }}>
       <span style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }}>{fmtSimT(e.simT)}</span>
-      <span style={{ color: SRC_COLOR[e.source], fontSize: 10, letterSpacing: '0.05em' }}>{e.source.toUpperCase()}</span>
       <span style={{ color: planned ? COLORS.PANEL_TEXT_DIM : SEV_COLOR[e.severity], fontSize: 10 }}>
         {planned ? 'PLAN' : e.kind}
       </span>

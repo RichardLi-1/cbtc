@@ -22,9 +22,12 @@ interface EventsStore {
   paused: boolean
   panelOpen: boolean
   injectOpen: boolean
+  /** Routine signal flips stay out of the list unless this is on. */
+  showSignals: boolean
   append: (e: Omit<SimEvent, 'id' | 't' | 'simT'> & { simT?: number | null }) => void
   clear: () => void
   togglePaused: () => void
+  toggleShowSignals: () => void
   setPanelOpen: (v: boolean) => void
   setInjectOpen: (v: boolean) => void
 }
@@ -42,6 +45,7 @@ export const useEventsStore = create<EventsStore>((set, get) => ({
   paused: false,
   panelOpen: !_startCollapsed,
   injectOpen: false,
+  showSignals: false,
   append: (e) => {
     if (get().paused) return
     const rt = useRuntimeStore.getState().runtime
@@ -57,6 +61,7 @@ export const useEventsStore = create<EventsStore>((set, get) => ({
   },
   clear: () => set({ events: [] }),
   togglePaused: () => set((s) => ({ paused: !s.paused })),
+  toggleShowSignals: () => set((s) => ({ showSignals: !s.showSignals })),
   setPanelOpen: (v) => set({ panelOpen: v }),
   setInjectOpen: (v) => set({ injectOpen: v }),
 }))
@@ -191,14 +196,7 @@ useRuntimeStore.subscribe((state) => {
         message: `${t.train_id} ${p.state} → ${t.state}${at}`,
       })
     }
-    if (p && !p.station_name && t.station_name && t.state === 'dwelling') {
-      append({
-        source: 'wayside',
-        severity: 'info',
-        kind: 'DWELL',
-        message: `${t.train_id} dwelling at ${t.station_name}`,
-      })
-    }
+    // Skip a second DWELL line — the TRAIN state change already says it.
     // ATP slack edge-triggers: only fire on the crossing, not every tick.
     if (p && p.atp_slack_m != null && t.atp_slack_m != null) {
       if (p.atp_slack_m >= 0 && t.atp_slack_m < 0) {
@@ -232,17 +230,26 @@ useRuntimeStore.subscribe((state) => {
     }
   }
 
-  // Signal aspect changes
+  // Signal aspect changes — one summary per tick, not 20 rows of green↔yellow.
   const prevSig = new Map(_prev.signals.map((s) => [s.signal_id, s.aspect]))
+  let sigN = 0
+  let toRed = 0
   for (const s of cur.signals) {
     const pv = prevSig.get(s.signal_id)
     if (pv && pv !== s.aspect) {
-      const sev: EventSeverity = s.aspect === 'red' ? 'warn' : 'info'
-      append({
-        source: 'wayside', severity: sev, kind: 'SIG',
-        message: `${s.signal_id} ${pv} → ${s.aspect}`,
-      })
+      sigN += 1
+      if (s.aspect === 'red') toRed += 1
     }
+  }
+  if (sigN > 0) {
+    append({
+      source: 'wayside',
+      severity: toRed > 0 ? 'warn' : 'info',
+      kind: 'SIG',
+      message: sigN === 1
+        ? `${cur.signals.find((s) => prevSig.get(s.signal_id) !== s.aspect)?.signal_id ?? 'signal'} changed`
+        : `${sigN} signals changed${toRed ? ` · ${toRed} to red` : ''}`,
+    })
   }
 
   _prev = cur
