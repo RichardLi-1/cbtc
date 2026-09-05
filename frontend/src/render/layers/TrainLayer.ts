@@ -4,8 +4,8 @@ import { COLORS } from '../../constants/colors'
 import { interpolatePolyline, tangentAtT } from '../../utils/geometry'
 import { safeZonePalette, slackTier } from '../../utils/safeZone'
 
-const TRAIN_W = 24   // screen px (half-width) — needs room for "Run NN" label
-const TRAIN_H = 5    // screen px (half-height)
+const TRAIN_W = 16   // screen px (half-width)
+const TRAIN_H = 4    // screen px (half-height)
 
 function trainColor(train: TrainPosition): string {
   if (train.state === 'dwelling') return COLORS.TRAIN_DWELL
