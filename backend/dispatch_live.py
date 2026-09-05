@@ -48,12 +48,15 @@ class LiveDispatchBridge:
             raise ValueError("mode must be 'rule' or 'ppo'")
         self.mode = mode
         try:
-            return self._post_json("/ml/dispatch/live/mode", {"mode": mode})
+            remote = self._post_json("/ml/dispatch/live/mode", {"mode": mode})
+            if "policy_ready" in remote:
+                self.policy_ready = bool(remote["policy_ready"])
+            self.last_error = None
         except Exception as exc:
             self.last_error = str(exc)
             if mode == "ppo":
                 raise
-            return self.status_payload()
+        return self.status_payload()
 
     def status_payload(self) -> dict[str, Any]:
         return {
