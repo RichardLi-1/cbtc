@@ -2,6 +2,8 @@
 
 A Line 1 (Yonge-University) board. Python sim is the source of truth. React + canvas is the glass.
 
+Deployed at: https://transitcontrol.richardli.dev/
+
 Trains run ATO with ATP gaps, dwell at platforms, and come out of Wilson Yard (between Sheppard West and Wilson). You can hold, express, or skip a run from the map. Safe zones, labels, zoom buttons, and a high-contrast theme are in the top bar / GUIDE menu.
 
 **GUIDE** answers “where is run 4?” and points at the UI. Events stay closed until you open them. Bottom-left **DISPATCH** switches live Rule vs PPO and can run an offline A/B (same seed). SIM time starts at 06:00, not your laptop clock.
