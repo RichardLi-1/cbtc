@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import posthog from 'posthog-js'
 import { useRuntimeStore } from '../store/runtimeStore'
 import { useConnectionStore, type EndpointHealth, type EndpointKey } from '../store/connectionStore'
@@ -6,6 +7,7 @@ import { useUiStore } from '../store/uiStore'
 import { COLORS } from '../constants/colors'
 import { isMlEnabled } from '../config/ml'
 import { useIsMobile } from '../hooks/useIsMobile'
+import { getHelpChatToggle } from './HelpChat'
 
 function useWallClock() {
   const [now, setNow] = useState(() => new Date())
@@ -133,7 +135,7 @@ export function ControlPanel() {
     >
       {/* Title */}
       <span style={{ color: COLORS.PANEL_TEXT, fontFamily: 'monospace', fontSize: 12, letterSpacing: '0.08em', marginRight: 8 }}>
-        CBTC DISPATCH
+        TRAIN TRAFFIC CONTROL
       </span>
 
       {/* Wall clock */}
@@ -190,6 +192,8 @@ export function ControlPanel() {
 
       <div style={{ flex: 1 }} />
 
+      <AccessMenu />
+
       <a
         href="https://github.com/RichardLi-1/cbtc"
         target="_blank"
@@ -215,6 +219,8 @@ export function ControlPanel() {
         </svg>
       </a>
 
+      <HelpBtn />
+
       <span data-help="info">
         <Btn label="INFO" onClick={() => { setInfoOpen(true); posthog.capture('info_panel_viewed') }} />
       </span>
@@ -229,5 +235,121 @@ export function ControlPanel() {
         {runtime?.trains?.length ?? 0} trains
       </span>
     </div>
+  )
+}
+
+function AccessMenu() {
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ top: 38, right: 14 })
+  const highContrast = useUiStore((s) => s.highContrast)
+  const setHighContrast = useUiStore((s) => s.setHighContrast)
+  const btn = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open || !btn.current) return
+    const r = btn.current.getBoundingClientRect()
+    setPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (btn.current?.contains(t) || menu.current?.contains(t)) return
+      setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div data-help="menu">
+      <button
+        ref={btn}
+        type="button"
+        aria-label="Accessibility menu"
+        aria-expanded={open}
+        aria-haspopup="true"
+        title="Accessibility"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          background: open ? COLORS.BUTTON_ACTIVE : COLORS.BUTTON_BG,
+          color: COLORS.PANEL_TEXT,
+          border: `1px solid ${COLORS.PANEL_BORDER}`,
+          borderRadius: 3,
+          padding: '3px 6px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          lineHeight: 0,
+          cursor: 'pointer',
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+          <path d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+      </button>
+      {open && createPortal(
+        <div
+          ref={menu}
+          role="menu"
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            right: pos.right,
+            zIndex: 200,
+            minWidth: 180,
+            background: COLORS.PANEL_BG,
+            border: `1px solid ${COLORS.PANEL_BORDER}`,
+            borderRadius: 3,
+            padding: 6,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.55)',
+          }}
+        >
+          <button
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={highContrast}
+            onClick={() => setHighContrast(!highContrast)}
+            style={{
+              width: '100%',
+              textAlign: 'left',
+              background: highContrast ? COLORS.BUTTON_ACTIVE : COLORS.BUTTON_BG,
+              color: COLORS.PANEL_TEXT,
+              border: `1px solid ${COLORS.PANEL_BORDER}`,
+              borderRadius: 3,
+              padding: '6px 8px',
+              fontFamily: 'monospace',
+              fontSize: 11,
+              cursor: 'pointer',
+              letterSpacing: '0.03em',
+            }}
+          >
+            High contrast {highContrast ? '●' : '○'}
+          </button>
+        </div>,
+        document.body,
+      )}
+    </div>
+  )
+}
+
+function HelpBtn() {
+  const [, rerender] = useState(0)
+  const { toggle, isOpen } = getHelpChatToggle()
+  const kick = useCallback(() => rerender((n) => n + 1), [])
+  useEffect(() => {
+    window.addEventListener('click', kick)
+    return () => window.removeEventListener('click', kick)
+  }, [kick])
+  return (
+    <Btn label="GUIDE" active={isOpen} onClick={toggle} />
   )
 }
