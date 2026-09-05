@@ -14,8 +14,10 @@ STOP_TOLERANCE_M = 20.0
 CREEP_SPEED_KPH = 5.0
 APPROACH_RADIUS_M = 550.0
 APPROACH_SPEED_KPH = 35.0
-# If nose is past berth but still creeping within this window, latch dwell at platform.
-PLATFORM_CREEP_PAST_M = 80.0
+# If nose is just past the berth while creeping (ATP overshoot), latch dwell.
+# Keep this tighter than a typical "already left" spawn (~50 m) so we don't
+# immediately re-dwell after departing.
+PLATFORM_CREEP_PAST_M = 35.0
 CRUISE_NOTCH = 2.0
 BRAKE_NOTCH = -3.5
 
