@@ -8,8 +8,21 @@ import { HelpPointer } from './HelpPointer'
 
 const STARTERS = ['Where is run 4?', 'What is the map?', 'How do I hold a train?', 'What is dispatch?']
 
+/** Let the ControlPanel host the HELP button. */
+let _toggleOpen: (() => void) | null = null
+let _isOpen = false
+export function getHelpChatToggle(): { toggle: () => void; isOpen: boolean } {
+  return { toggle: () => _toggleOpen?.(), isOpen: _isOpen }
+}
+
 export function HelpChat() {
   const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    _toggleOpen = () => setOpen((v) => !v)
+    return () => { _toggleOpen = null }
+  }, [])
+  useEffect(() => { _isOpen = open }, [open])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [point, setPoint] = useState<HelpTargetId | null>(null)
@@ -65,28 +78,6 @@ export function HelpChat() {
   return createPortal(
     <>
       <HelpPointer target={point} />
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        title="Ask about the board"
-        style={{
-          position: 'fixed',
-          top: 7,
-          right,
-          zIndex: 200,
-          background: open ? COLORS.BUTTON_ACTIVE : COLORS.BUTTON_BG,
-          color: COLORS.PANEL_TEXT,
-          border: `1px solid ${COLORS.PANEL_BORDER}`,
-          borderRadius: 3,
-          padding: '3px 10px',
-          fontSize: 11,
-          fontFamily: 'monospace',
-          cursor: 'pointer',
-          letterSpacing: '0.03em',
-        }}
-      >
-        HELP
-      </button>
       {open && (
         <div
           style={{
@@ -204,7 +195,7 @@ export function HelpChat() {
                 cursor: busy ? 'wait' : 'pointer',
               }}
             >
-              ASK
+              SEND
             </button>
           </form>
         </div>
