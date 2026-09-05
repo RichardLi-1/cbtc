@@ -2,6 +2,8 @@ export const HELP_TARGET_IDS = [
   'header',
   'status',
   'map',
+  'zoom',
+  'menu',
   'events',
   'inject',
   'dispatch',
@@ -25,7 +27,7 @@ export const HELP_TARGETS: HelpTarget[] = [
     label: 'top bar',
     keywords: ['header', 'top bar', 'toolbar', 'clock', 'sim time', 'title'],
     answer:
-      'The top bar is the control strip. Left: clocks (wall + SIM time from 06:00). Middle: green/red dots show if each backend is up. Right: buttons for help, info, and view toggles.',
+      'The top bar is the control strip. Left: clocks (wall + SIM time from 06:00). Middle: green/red dots show if each backend is up. Right: menu (high contrast), GUIDE, info, and view toggles.',
   },
   {
     id: 'status',
@@ -37,9 +39,23 @@ export const HELP_TARGETS: HelpTarget[] = [
   {
     id: 'map',
     label: 'track map',
-    keywords: ['map', 'canvas', 'track', 'train', 'switch', 'signal', 'zoom', 'pan', 'click', 'hold', 'express', 'skip'],
+    keywords: ['map', 'canvas', 'track', 'train', 'switch', 'signal', 'pan', 'click', 'hold', 'express', 'skip'],
     answer:
-      'The big dark area is the track map. Drag to pan, scroll to zoom, double-click to fit. Hover for tooltips. Click a switch or signal to command it. Click a train for hold / express / skip / release.',
+      'The big dark area is the track map. Drag to pan, scroll to zoom, or use the + / − / FIT buttons. Double-click or press 0 to fit. Hover for tooltips. Click a switch or signal to command it. Click a train for hold / express / skip / release.',
+  },
+  {
+    id: 'zoom',
+    label: 'zoom buttons',
+    keywords: ['zoom', 'magnify', 'bigger', 'smaller', 'fit', 'plus', 'minus', 'keyboard'],
+    answer:
+      'The + − FIT stack on the map zooms without a scroll wheel. + / − keys zoom. 0 fits the whole line. Double-click the map also fits.',
+  },
+  {
+    id: 'menu',
+    label: 'accessibility menu',
+    keywords: ['menu', 'hamburger', 'high contrast', 'contrast', 'accessibility', 'a11y', 'theme'],
+    answer:
+      'The three-line menu in the top bar has High contrast: white text, black panels, thicker tracks. It stays on after refresh.',
   },
   {
     id: 'events',
@@ -81,7 +97,7 @@ export const HELP_TARGETS: HelpTarget[] = [
     label: 'info',
     keywords: ['info', 'about', 'what is this', 'help me start'],
     answer:
-      'INFO is a short primer on this dispatch board. HELP (this chat) can also point at the live UI. Ctrl+Shift+C opens a hidden config panel.',
+      'INFO is a short primer on this board. GUIDE (this chat) can also point at the live UI. Ctrl+Shift+C opens a hidden config panel.',
   },
 ]
 
