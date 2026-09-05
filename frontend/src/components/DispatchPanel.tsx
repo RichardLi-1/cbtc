@@ -210,7 +210,7 @@ export function DispatchPanel() {
       </div>
 
       <div style={{ color: COLORS.PANEL_TEXT_DIM, marginBottom: 8, lineHeight: 1.4, fontSize: 10 }}>
-        <b>A/B compare</b> runs both policies offline on the same seed and reports the deltas below.
+        Offline rule vs PPO, same seed.
         {policyReady === false && (
           <span style={{ color: COLORS.ERROR_BANNER, display: 'block', marginTop: 4 }}>
             ML API or policy missing — run npm run setup && npm run dev
@@ -218,7 +218,7 @@ export function DispatchPanel() {
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: data ? 10 : 0 }}>
         <button
           type="button"
           disabled={loading}
@@ -242,8 +242,9 @@ export function DispatchPanel() {
         )}
       </div>
 
-      {error && <div style={{ color: COLORS.ERROR_BANNER, marginBottom: 8 }}>{error}</div>}
+      {error && <div style={{ color: COLORS.ERROR_BANNER, marginTop: 8 }}>{error}</div>}
 
+      {data && (
       <table style={{ width: '100%', borderCollapse: 'collapse', color: COLORS.PANEL_TEXT, fontSize: 10 }}>
         <thead>
           <tr style={{ color: COLORS.PANEL_TEXT_DIM, textAlign: 'left' }}>
@@ -282,6 +283,7 @@ export function DispatchPanel() {
           </tr>
         </tbody>
       </table>
+      )}
     </div>
   )
 }
