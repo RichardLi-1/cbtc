@@ -1,4 +1,4 @@
-export const COLORS = {
+const DEFAULT = {
   BACKGROUND: '#080d12',
   GRID: '#0f1a24',
 
@@ -59,6 +59,62 @@ export const COLORS = {
   ERROR_BANNER: '#b71c1c',
   STALE_BANNER: '#e65100',
   SUCCESS: '#00e676',
-} as const
+}
+
+type Palette = typeof DEFAULT
+
+/** White-on-black, thicker tracks, no dim gray. */
+const HIGH_CONTRAST: Palette = {
+  ...DEFAULT,
+  BACKGROUND: '#000000',
+  GRID: '#222222',
+  TRACK_CLEAR: '#39ff14',
+  TRACK_OCCUPIED: '#ff3333',
+  TRACK_UNKNOWN: '#bbbbbb',
+  TRACK_CROSSOVER: '#00e5ff',
+  TRACK_WIDTH: 4,
+  TRACK_CROSSOVER_WIDTH: 3,
+  SIGNAL_GREEN: '#39ff14',
+  SIGNAL_YELLOW: '#ffff00',
+  SIGNAL_RED: '#ff3333',
+  SIGNAL_FLASHING_YELLOW: '#ffcc00',
+  SIGNAL_DARK: '#111111',
+  SIGNAL_BORDER: '#ffffff',
+  SIGNAL_RADIUS: 6,
+  STATION_MARKER_FILL: '#ffff00',
+  STATION_MARKER_BORDER: '#ffffff',
+  STATION_MARKER_HALO: 'rgba(255, 255, 0, 0.45)',
+  STATION_LABEL_BG: 'rgba(0, 0, 0, 0.92)',
+  SWITCH_NORMAL: '#00ffff',
+  SWITCH_REVERSE: '#ff8800',
+  SWITCH_RADIUS: 9,
+  TRAIN_FILL: '#00aaff',
+  TRAIN_BORDER: '#ffffff',
+  TRAIN_LABEL: '#ffffff',
+  TRAIN_DWELL: '#ff00ff',
+  TRAIN_ARRIVING: '#00aaff',
+  TRAIN_SAFE_ZONE_FRONT: 'rgba(57, 255, 20, 0.35)',
+  TRAIN_SAFE_ZONE_REAR: 'rgba(255, 136, 0, 0.3)',
+  STATION_LABEL: '#ffffff',
+  TRAIN_ID_LABEL: '#ffffff',
+  HUD: '#ffffff',
+  PANEL_BG: '#000000',
+  PANEL_BORDER: '#ffffff',
+  PANEL_TEXT: '#ffffff',
+  PANEL_TEXT_DIM: '#dddddd',
+  BUTTON_BG: '#111111',
+  BUTTON_HOVER: '#333333',
+  BUTTON_ACTIVE: '#0066ff',
+  ERROR_BANNER: '#ff6666',
+  STALE_BANNER: '#ffcc00',
+  SUCCESS: '#39ff14',
+}
+
+/** Live palette. Mutated by applyHighContrast so canvas + UI stay in sync. */
+export const COLORS: Palette = { ...DEFAULT }
+
+export function applyHighContrast(on: boolean): void {
+  Object.assign(COLORS, on ? HIGH_CONTRAST : DEFAULT)
+}
 
 export type Color = typeof COLORS[keyof typeof COLORS]
