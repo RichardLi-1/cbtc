@@ -11,13 +11,13 @@ from train import Train, TrainCommand
 
 DEFAULT_DWELL_SEC = 18.0
 STOP_TOLERANCE_M = 20.0
-CREEP_SPEED_KPH = 5.0
+CREEP_SPEED_KPH = 12.0
 APPROACH_RADIUS_M = 550.0
 APPROACH_SPEED_KPH = 35.0
-# If nose is just past the berth while creeping (ATP overshoot), latch dwell.
-# Keep this tighter than a typical "already left" spawn (~50 m) so we don't
-# immediately re-dwell after departing.
-PLATFORM_CREEP_PAST_M = 35.0
+# Still at the platform if the nose just overshot (ATP / late brake).
+# After a real dwell, stop_index already points at the *next* berth, so this
+# does not re-dwell on departure.
+PLATFORM_PAST_M = 120.0
 CRUISE_NOTCH = 2.0
 BRAKE_NOTCH = -3.5
 
@@ -93,10 +93,10 @@ class AtoController:
         dist, ahead = berth_approach(train.chainage_front_m, berth.chainage_m, self.route_len_m)
         v = train.speed
 
-        # Already passed this berth — dwell if we're still close (incl. v=0 case
-        # where ATP stopped us just past the platform); else target the next stop.
+        # Already passed this berth — dwell if we're still on the platform;
+        # otherwise this stop is gone, aim at the next one.
         if ahead > self.cfg.stop_tolerance_m:
-            if not self._should_skip(train) and v <= CREEP_SPEED_KPH and ahead <= PLATFORM_CREEP_PAST_M:
+            if not self._should_skip(train) and ahead <= PLATFORM_PAST_M:
                 return self._latch_dwell(train, berth)
             if self._should_skip(train):
                 self._count_skip(train)

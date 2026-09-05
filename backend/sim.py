@@ -5,6 +5,7 @@ from __future__ import annotations
 from ato import AtoController
 from dispatch_live import live_dispatch
 from events import registry as event_registry
+from stations import outbound_passenger_berths
 from zone_controller import ZoneController
 import train
 from route_geom import ROUTE_LEN_M, forward_distance
@@ -13,6 +14,18 @@ DT = 0.5
 SPAWN_HEADWAY_S = 120.0
 SPAWN_MAX_TRAINS = 24
 SPAWN_CLEARANCE_M = 250.0
+
+
+def _wilson_yard_chainage() -> tuple[float, int]:
+    """Wilson Yard sits between Sheppard West and Wilson. Return (chainage, next stop_index)."""
+    berths = outbound_passenger_berths()
+    by_name = {b.name: (b.chainage_m, i) for i, b in enumerate(berths)}
+    sheppard = by_name["Sheppard West"][0]
+    wilson_ch, wilson_idx = by_name["Wilson"]
+    return (sheppard + wilson_ch) / 2.0, wilson_idx
+
+
+SPAWN_CHAINAGE_M, SPAWN_STOP_INDEX = _wilson_yard_chainage()
 
 
 class Simulation:
@@ -32,7 +45,7 @@ class Simulation:
 
     def _yard_occupied(self, line: train.Line) -> bool:
         for tr in line.trains:
-            gap = forward_distance(0.0, tr.chainage_front_m, self.route_len_m)
+            gap = forward_distance(SPAWN_CHAINAGE_M, tr.chainage_front_m, self.route_len_m)
             if gap < SPAWN_CLEARANCE_M:
                 return True
         return False
@@ -50,7 +63,8 @@ class Simulation:
             return False
 
         next_run = max((t.run_number or 0) for t in line.trains) + 1 if line.trains else 0
-        t = train.Train(chainage_front_m=0.0, direction=1, run_number=next_run, length_m=138.0)
+        t = train.Train(chainage_front_m=SPAWN_CHAINAGE_M, direction=1, run_number=next_run, length_m=138.0)
+        t.stop_index = SPAWN_STOP_INDEX
         t.apply_command(train.TrainCommand(direction=1, acceleration_level=2.0, e_brake=False))
         line.trains.append(t)
         self._spawn_elapsed_s = 0.0

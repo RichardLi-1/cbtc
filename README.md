@@ -1,6 +1,6 @@
 # TTC Train Traffic Control Simulator
 
-A Line 1 (Yonge-University) board. Python sim is the source of truth. React + canvas is the glass.
+A Toronto Subway Line 1 (Yonge-University) board. Python sim is the source of truth. React + canvas is the glass.
 
 Deployed at: https://transitcontrol.richardli.dev/
 
@@ -32,3 +32,6 @@ Vite proxies `/topology` `/state` `/commands` to :8000 and `/ml` to :8001.
 npm run build:frontend
 docker compose up --build    # UI :8080
 ```
+
+## License
+MIT

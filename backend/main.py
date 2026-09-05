@@ -91,8 +91,7 @@ if train.lines and train.lines[0].trains:
             ),
         )
 
-    # Offset initial roster by half a slot so train 0 isn't sitting on chainage 0
-    # (which would permanently block the yard-clearance spawn check).
+    # Spread the opening roster around the loop so they are not piled on the yard.
     for i, t in enumerate(roster):
         t.chainage_front_m = ROUTE_LEN_M * (i + 0.5) / max(len(roster), 1)
         t.speed = 25.0
