@@ -1,4 +1,4 @@
-# Train Traffic Control
+# TTC Train Traffic Control Simulator
 
 A Line 1 (Yonge-University) board. Python sim is the source of truth. React + canvas is the glass.
 
