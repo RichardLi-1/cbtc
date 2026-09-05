@@ -71,7 +71,7 @@ export function EventsPanel() {
       }}>
         <span style={{ letterSpacing: '0.1em', flex: 1 }}>EVENTS</span>
         <span style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }}>{visible.length}</span>
-        <MiniBtn label={showSignals ? 'SIG ●' : 'SIG ○'} onClick={toggleShowSignals} active={showSignals} title="Show routine signal flips" />
+        <MiniBtn label={showSignals ? 'SIGNALS ●' : 'SIGNALS ○'} onClick={toggleShowSignals} active={showSignals} title="Show routine signal changes" />
         <MiniBtn label={paused ? 'RESUME' : 'PAUSE'} onClick={togglePaused} active={paused} />
         <MiniBtn label="CLEAR" onClick={clear} />
         <MiniBtn label="✕" onClick={() => setPanelOpen(false)} title="Hide panel" />
@@ -107,7 +107,7 @@ export function EventsPanel() {
           <div style={{ padding: 14, color: COLORS.PANEL_TEXT_DIM, fontSize: 11 }}>
             {events.length === 0
               ? 'no events yet — system idle.'
-              : 'only signal noise so far — turn on SIG to see it.'}
+              : 'only routine signal changes so far — turn on SIGNALS to see them.'}
           </div>
         )}
         {visible.map((e) => <EventRow key={e.id} e={e} />)}
@@ -116,19 +116,39 @@ export function EventsPanel() {
   )
 }
 
+const KIND_LABEL_DISPLAY: Record<string, string> = {
+  SIG:   'SIGNAL',
+  SW:    'SWITCH',
+  TRAIN: 'TRAIN',
+  ATP:   'SAFETY',
+  EB:    'E-BRAKE',
+  CMD:   'COMMAND',
+  LINK:  'LINK',
+  INIT:  'SYSTEM',
+  DISP:  'DISPATCH',
+  PLAN:  'PLANNED',
+  TSR:   'SPEED',
+  HOLD:  'HOLD',
+  NOTE:  'NOTE',
+}
+
+function kindLabel(kind: string): string {
+  return KIND_LABEL_DISPLAY[kind] ?? kind
+}
+
 function EventRow({ e }: { e: SimEvent }) {
   const planned = e.kind === 'PLAN'
   return (
     <div style={{
       padding: '5px 10px', borderBottom: `1px solid #0d1620`,
-      display: 'grid', gridTemplateColumns: '64px 44px 1fr', gap: 8, alignItems: 'baseline',
+      display: 'grid', gridTemplateColumns: '64px 64px 1fr', gap: 8, alignItems: 'baseline',
       fontSize: 11, lineHeight: 1.4,
       opacity: planned ? 0.85 : 1,
       fontStyle: planned ? 'italic' : 'normal',
     }}>
       <span style={{ color: COLORS.PANEL_TEXT_DIM, fontSize: 10 }}>{fmtSimT(e.simT)}</span>
       <span style={{ color: planned ? COLORS.PANEL_TEXT_DIM : SEV_COLOR[e.severity], fontSize: 10 }}>
-        {planned ? 'PLAN' : e.kind}
+        {planned ? 'PLANNED' : kindLabel(e.kind)}
       </span>
       <span style={{ color: planned ? COLORS.PANEL_TEXT_DIM : SEV_COLOR[e.severity] }}>{e.message}</span>
     </div>
