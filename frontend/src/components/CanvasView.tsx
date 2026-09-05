@@ -11,6 +11,7 @@ import { COLORS } from '../constants/colors'
 import { interpolatePolyline, hitTestPoint } from '../utils/geometry'
 import type { HoveredEntity, Topology, RuntimeState, DispatchAction } from '../types/domain'
 import { Tooltip } from './Tooltip'
+import { useEventsStore } from '../store/eventsStore'
 
 // Shared viewport instance — lives outside React so the rAF loop can close over it
 const vp = new Viewport()
@@ -261,8 +262,7 @@ export function CanvasView() {
 
   const onTouchEnd = useCallback(() => { pinchDist.current = 0 }, [])
 
-  // Double-click: fit to bounds
-  const onDoubleClick = useCallback(() => {
+  const fitMap = useCallback(() => {
     const topo = useTopologyStore.getState().topology
     if (!topo) return
     vp.fitToBounds({
@@ -273,8 +273,37 @@ export function CanvasView() {
     })
   }, [])
 
+  const zoomBy = useCallback((factor: number) => {
+    vp.zoomAtPoint(factor, vp.width / 2, vp.height / 2)
+  }, [])
+
+  // Double-click: fit to bounds
+  const onDoubleClick = fitMap
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) {
+        return
+      }
+      if (e.key === '+' || e.key === '=' || e.key === 'Add') {
+        e.preventDefault()
+        zoomBy(1.25)
+      } else if (e.key === '-' || e.key === '_' || e.key === 'Subtract') {
+        e.preventDefault()
+        zoomBy(1 / 1.25)
+      } else if (e.key === '0' || e.key === 'Home') {
+        e.preventDefault()
+        fitMap()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoomBy, fitMap])
+
   const { topology: topoForTooltip, } = useTopologyStore()
   const { runtime: rtForTooltip } = useRuntimeStore()
+  const eventsOpen = useEventsStore((s) => s.panelOpen)
 
   return (
     <>
@@ -305,7 +334,60 @@ export function CanvasView() {
           onClose={() => setTrainMenu(null)}
         />
       )}
+      <div
+        data-help="zoom"
+        style={{
+          position: 'absolute',
+          right: eventsOpen ? 352 : 16,
+          bottom: 16,
+          zIndex: 40,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+        }}
+      >
+        <ZoomBtn label="+" ariaLabel="Zoom in" title="Zoom in (+)" onClick={() => zoomBy(1.25)} />
+        <ZoomBtn label="−" ariaLabel="Zoom out" title="Zoom out (−)" onClick={() => zoomBy(1 / 1.25)} />
+        <ZoomBtn label="FIT" ariaLabel="Fit map" title="Fit map (0)" onClick={fitMap} />
+      </div>
     </>
+  )
+}
+
+function ZoomBtn({
+  label, ariaLabel, title, onClick,
+}: {
+  label: string
+  ariaLabel: string
+  title: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      title={title}
+      onClick={onClick}
+      style={{
+        width: 36,
+        height: 36,
+        background: COLORS.BUTTON_BG,
+        color: COLORS.PANEL_TEXT,
+        border: `1px solid ${COLORS.PANEL_BORDER}`,
+        borderRadius: 3,
+        fontFamily: 'monospace',
+        fontSize: label.length > 1 ? 10 : 18,
+        fontWeight: 700,
+        letterSpacing: label.length > 1 ? '0.06em' : 0,
+        cursor: 'pointer',
+        lineHeight: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {label}
+    </button>
   )
 }
 
