@@ -179,13 +179,10 @@ export async function commandSignal(signalId: string, aspect: SignalAspect): Pro
 
 // ── ML API (requires ML service on :8001 or VITE_ML_BASE) ───────────────────
 
-// ML runs on Fly with auto-stop, so the first ping may hit a cold start.
-// Give it a longer timeout and retries instead of erroring on the wake-up.
-const ML_HEALTH_TIMEOUT_MS = 15000
-
 export async function fetchMlHealth(): Promise<{ ok: boolean }> {
   if (MOCK_MODE || !isMlEnabled()) return { ok: false }
-  return withRetry(() => apiFetch<{ ok: boolean }>('/ml/health', undefined, ML_HEALTH_TIMEOUT_MS))
+  // Single ping. App.tsx keeps retrying — ML (torch) can take ~30s to bind :8001.
+  return apiFetch<{ ok: boolean }>('/ml/health')
 }
 
 export async function fetchTrainingStatus(): Promise<TrainingStatus> {
