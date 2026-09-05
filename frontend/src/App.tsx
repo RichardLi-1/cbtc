@@ -21,7 +21,7 @@ export default function App() {
   const { load } = useTopologyStore()
   const { startPolling, stopPolling } = useRuntimeStore()
   const [configOpen, setConfigOpen] = useState(false)
-  const { infoOpen, setInfoOpen, toggleDevMode } = useUiStore()
+  const { infoOpen, setInfoOpen, toggleDevMode, highContrast } = useUiStore()
 
   usePageViewTracker()
   const mlOn = isMlEnabled()
@@ -34,9 +34,28 @@ export default function App() {
 
   useEffect(() => {
     if (!mlOn) return
-    void fetchMlHealth()
-      .then(() => useConnectionStore.getState().report('ml', 'ok'))
-      .catch((err) => useConnectionStore.getState().report('ml', 'error', String(err)))
+    let cancelled = false
+    let timer = 0
+    const graceUntil = Date.now() + 60_000
+
+    const tick = async () => {
+      try {
+        await fetchMlHealth()
+        if (!cancelled) useConnectionStore.getState().report('ml', 'ok')
+      } catch (err) {
+        // Vite returns HTTP 500 while :8001 is still starting. Wait before alarming.
+        if (!cancelled && Date.now() >= graceUntil) {
+          useConnectionStore.getState().report('ml', 'error', String(err))
+        }
+      }
+      if (!cancelled) timer = window.setTimeout(() => { void tick() }, 3000)
+    }
+
+    void tick()
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
   }, [mlOn])
 
   // Ctrl+Shift+C = hidden config. Ctrl+Shift+D = endpoint dots (dev mode).
@@ -56,7 +75,10 @@ export default function App() {
   }, [onKeyDown])
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', background: COLORS.BACKGROUND, overflow: 'hidden' }}>
+    <div
+      data-contrast={highContrast ? 'high' : 'normal'}
+      style={{ position: 'relative', width: '100vw', height: '100vh', background: COLORS.BACKGROUND, overflow: 'hidden' }}
+    >
       <ControlPanel />
       <BackendNotice />
       <div data-help="map" style={{ position: 'absolute', top: 38, left: 0, right: 0, bottom: 0 }}>
